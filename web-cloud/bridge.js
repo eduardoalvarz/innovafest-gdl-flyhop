@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Puente MAVLink -> WebSocket para Torre OTECH, en local.
+ * Puente MAVLink -> WebSocket para AeroHub Link, en local.
  *
  *   OTECH-GroundStation  --UDP 14550-->  este proceso  --WS 8081-->  navegador
  *                                              |
@@ -17,6 +17,7 @@ const fs = require("fs");
 const path = require("path");
 const { WebSocketServer } = require("ws");
 const { MavlinkParser, SEVERITY, FIX_TYPE, MAV_TYPE, px4Mode } = require("./mavlink");
+const agente = require("./agente");
 
 /* ── Configuración ────────────────────────────────────────────────────── */
 
@@ -34,7 +35,7 @@ const CFG = {
     port: Number(process.env.OTECH_DB_PORT || 3306),
     user: process.env.OTECH_DB_USER || "root",
     password: process.env.OTECH_DB_PASS || "",
-    database: process.env.OTECH_DB_NAME || "otech_torre"
+    database: process.env.OTECH_DB_NAME || "aerohub_link"
   }
 };
 
@@ -171,7 +172,10 @@ udp.bind(CFG.udpPort, () => {
   console.log("  MAVLink   escuchando  udp://0.0.0.0:" + CFG.udpPort + "  (solo lectura)");
 });
 
-/* Un enlace se da por caído si no llega nada en 3 s */
+/* Un enlace se da por caído si no llega nada en 3 s. En la misma pasada se
+   acumulan los extremos del vuelo (techo, velocidad máxima, batería mínima)
+   que el asistente necesita para resumir: muestrearlos a 1 Hz aquí evita
+   depender de un histórico en base de datos que es opcional. */
 setInterval(() => {
   const ahora = Date.now();
   for (const v of flota.values()) {
@@ -179,6 +183,7 @@ setInterval(() => {
       v.enlace = false;
       log("warn", "Telemetría perdida", v.sysid);
     }
+    agente.acumular(v);
   }
 }, 1000);
 
@@ -271,10 +276,89 @@ function json(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
+function cuerpoJson(req, limite = 262144) {
+  return new Promise((resolve, reject) => {
+    let bruto = "", n = 0;
+    req.on("data", (c) => {
+      n += c.length;
+      if (n > limite) { req.destroy(); reject(new Error("cuerpo demasiado grande")); return; }
+      bruto += c;
+    });
+    req.on("end", () => { try { resolve(JSON.parse(bruto || "{}")); } catch (e) { reject(e); } });
+    req.on("error", reject);
+  });
+}
+
+/* Lo que ve el asistente. Es exactamente el mismo estado que ve la consola:
+   no hay una fuente de verdad paralela que pueda desincronizarse. */
+function estadoActual() {
+  return { flota: [...flota.values()], eventos, logs: catalogo() };
+}
+
+async function apiAgente(req, res, p) {
+  if (p.length === 2 && req.method === "GET") {
+    let disponibles = [], vivo = false, fallo = null;
+    try { disponibles = await agente.modelos(); vivo = true; }
+    catch (e) { fallo = e.message; }
+    return json(res, 200, {
+      vivo, fallo, host: agente.CFG.host, modelo: agente.CFG.modelo,
+      modelos: disponibles, umbrales: agente.U
+    });
+  }
+
+  if (p[2] === "informe" && req.method === "GET") {
+    return json(res, 200, { informe: agente.informe(estadoActual()) });
+  }
+
+  if (p[2] === "chat" && req.method === "POST") {
+    let cuerpo;
+    try { cuerpo = await cuerpoJson(req); }
+    catch (e) { return json(res, 400, { error: e.message }); }
+
+    const mensaje = String(cuerpo.mensaje || "").trim();
+    if (!mensaje) return json(res, 400, { error: "falta el mensaje" });
+
+    /* Se transmite por SSE y no por el WebSocket de telemetría a propósito:
+       una respuesta larga bloquearía las tramas de vuelo, y estas tienen
+       prioridad sobre cualquier conversación. */
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no"
+    });
+    const enviar = (o) => res.write("data: " + JSON.stringify(o) + "\n\n");
+
+    const abortar = new AbortController();
+    req.on("close", () => abortar.abort());
+
+    try {
+      for await (const t of agente.preguntar(mensaje, cuerpo.historial, estadoActual(),
+                                             abortar.signal, cuerpo.modelo)) {
+        enviar(t);
+      }
+    } catch (e) {
+      if (e.name !== "AbortError") {
+        const pista = /ECONNREFUSED|fetch failed/i.test(e.message)
+          ? "No hay respuesta de Ollama en " + agente.CFG.host + ". ¿Está corriendo?"
+          : e.message;
+        enviar({ error: pista });
+      }
+    }
+    res.end();
+    return;
+  }
+
+  json(res, 404, { error: "ruta de agente desconocida" });
+}
+
 function api(req, res, ruta) {
   const p = ruta.split("/").filter(Boolean);          // ["api", "logs", ...]
 
   if (p[1] === "camaras" && req.method === "GET") return json(res, 200, { camaras: camaras() });
+  if (p[1] === "agente") return void apiAgente(req, res, p).catch((e) => {
+    try { json(res, 500, { error: e.message }); } catch (_) { res.end(); }
+  });
   if (p[1] !== "logs") return json(res, 404, { error: "ruta desconocida" });
 
   if (p.length === 2 && req.method === "GET") return json(res, 200, { logs: catalogo() });
@@ -512,7 +596,9 @@ if (process.argv.includes("--demo")) {
 }
 
 console.log("");
-console.log("  Torre OTECH — puente local");
+console.log("  Asistente " + agente.CFG.modelo + " vía " + agente.CFG.host + "  (solo consulta)");
+console.log("");
+console.log("  AeroHub Link — puente local");
 console.log("  El mando permanece en el enlace RF. Esta capa solo observa.");
 console.log("");
 

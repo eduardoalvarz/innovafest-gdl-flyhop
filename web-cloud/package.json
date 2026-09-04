@@ -1,13 +1,13 @@
 {
-  "name": "torre-otech-local",
+  "name": "aerohub-link-local",
   "version": "0.1.0",
   "private": true,
-  "description": "Capa de supervisión local para OTECH-GroundStation: puente MAVLink -> WebSocket y consola web",
+  "description": "Capa de supervisión local para OTECH-GroundStation: puente MAVLink -> WebSocket, consola web y asistente en lenguaje natural",
   "main": "bridge.js",
   "scripts": {
     "start": "node bridge.js",
     "demo": "node bridge.js --demo",
-    "test": "node prueba-mavlink.js"
+    "test": "node prueba-mavlink.js && node prueba-agente.js"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

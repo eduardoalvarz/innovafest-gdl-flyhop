@@ -1,13 +1,13 @@
--- Torre OTECH — histórico de telemetría (MariaDB de XAMPP)
+-- AeroHub Link — histórico de telemetría (MariaDB de XAMPP)
 --
 -- Cargar con:
 --   D:\xampp\mysql\bin\mysql.exe -u root < schema.sql
 -- o pegándolo en phpMyAdmin.
 
-CREATE DATABASE IF NOT EXISTS otech_torre
+CREATE DATABASE IF NOT EXISTS aerohub_link
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-USE otech_torre;
+USE aerohub_link;
 
 -- Una fila por segundo y aeronave. A 1 Hz son ~86 k filas por día y aeronave;
 -- con la partición mensual de abajo, purgar un periodo es soltar particiones

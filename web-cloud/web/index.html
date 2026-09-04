@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Torre OTECH</title>
+<title>AeroHub Link</title>
 <link rel="icon" href="assets/otech.png">
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 
 <style>
-/* Torre OTECH — consola de supervisión local.
+/* AeroHub Link — consola de supervisión local.
    Paleta derivada de la identidad ya aplicada al GCS: navy #0F1B3D, cian #1E98C1.
    Los neutros llevan sesgo azul a propósito. */
 
@@ -236,6 +236,68 @@ body{margin:0;background:var(--ground);color:var(--ink);
   border:1px solid rgba(255,255,255,.3);background:rgba(6,14,26,.6);color:#dbe7f7;
   cursor:pointer;display:grid;place-items:center;font-size:13px;line-height:1;padding:0}
 
+/* — asistente — */
+.chat{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.chat-aviso{display:flex;align-items:center;gap:9px;padding:8px 16px;flex-shrink:0;
+  border-bottom:1px solid var(--panel-edge);font-size:11.5px;color:var(--muted);
+  background:color-mix(in srgb,var(--warn) 9%,transparent)}
+.chat-aviso svg{width:14px;height:14px;color:var(--warn);flex-shrink:0}
+.chat-aviso b{color:var(--ink-soft);font-weight:600}
+.hilo{flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.msg{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start;max-width:860px}
+.msg-ava{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;flex-shrink:0;
+  font-family:var(--font-display);font-size:10px;font-weight:700;letter-spacing:.04em}
+.msg.yo{margin-left:auto;grid-template-columns:1fr 26px}
+.msg.yo .msg-ava{order:2;background:var(--brand-wash);color:var(--brand-bright);
+  border:1px solid color-mix(in srgb,var(--brand) 40%,transparent)}
+.msg.ia .msg-ava{background:var(--brand);color:#fff}
+.msg-cuerpo{font-size:13.5px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}
+.msg.yo .msg-cuerpo{order:1;text-align:left;background:var(--brand-wash);border-radius:12px 12px 3px 12px;
+  padding:9px 13px;border:1px solid var(--panel-edge)}
+.msg-meta{font-family:var(--font-data);font-size:10px;color:var(--muted-dim);margin-top:6px}
+.msg-err{color:var(--crit)}
+.cursor-ia::after{content:"▍";animation:parpadeo 1s steps(2) infinite;color:var(--brand-bright)}
+@keyframes parpadeo{50%{opacity:0}}
+
+/* Tarjeta de alarma. La emite el servidor con los umbrales del sistema y no
+   pasa por el modelo: es la única parte del chat en la que se puede confiar
+   sin leer nada más. */
+.alarma{border:1px solid var(--crit);border-left-width:3px;border-radius:10px;
+  background:color-mix(in srgb,var(--crit) 10%,transparent);padding:10px 13px;max-width:860px}
+.alarma-tit{display:flex;align-items:center;gap:7px;font-family:var(--font-display);font-size:11px;
+  font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--crit)}
+.alarma-tit svg{width:14px;height:14px}
+.alarma ul{margin:7px 0 0;padding-left:18px;font-size:13px;line-height:1.55}
+.alarma li{margin-bottom:2px}
+.alarma .et{font-family:var(--font-data);font-size:10px;padding:1px 5px;border-radius:4px;
+  color:#08121f;background:var(--c);margin-right:5px}
+.alarma-pie{font-size:11px;color:var(--muted);margin-top:7px;font-style:italic}
+
+.chat-vacio{margin:auto;text-align:center;color:var(--muted);max-width:520px;padding:20px}
+.chat-vacio h3{font-family:var(--font-display);font-size:17px;font-weight:600;color:var(--ink);
+  margin:0 0 6px;letter-spacing:.03em}
+.chat-vacio p{margin:0 0 18px;font-size:13px;line-height:1.55}
+.sugerencias{display:flex;flex-wrap:wrap;gap:7px;justify-content:center}
+.sug{padding:7px 12px;border-radius:999px;border:1px solid var(--panel-edge);background:none;
+  color:var(--ink-soft);font-family:var(--font-body);font-size:12.5px;cursor:pointer;transition:.15s}
+.sug:hover{background:var(--brand-wash);border-color:var(--brand);color:var(--ink)}
+
+.compositor{flex-shrink:0;border-top:1px solid var(--panel-edge);padding:11px 14px}
+.comp-caja{display:flex;gap:9px;align-items:flex-end}
+.comp-caja textarea{flex:1;resize:none;font-family:var(--font-body);font-size:13.5px;line-height:1.5;
+  padding:9px 12px;border-radius:10px;border:1px solid var(--panel-edge);background:var(--panel-solid);
+  color:var(--ink);max-height:160px;min-height:40px}
+.comp-caja textarea:focus{outline:2px solid var(--brand-bright);outline-offset:-1px}
+.enviar{width:40px;height:40px;flex-shrink:0;border-radius:10px;border:none;cursor:pointer;
+  background:var(--brand);color:#fff;display:grid;place-items:center}
+.enviar:hover{background:var(--brand-bright)}
+.enviar:disabled{opacity:.45;cursor:default}
+.enviar svg{width:17px;height:17px}
+.comp-pie{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11px;color:var(--muted-dim);
+  font-family:var(--font-data);flex-wrap:wrap}
+.comp-pie select{font-size:11px;padding:2px 6px;border-radius:5px;font-family:var(--font-data)}
+.estado-llm{display:inline-flex;align-items:center;gap:5px}
+
 /* — bitácoras — */
 .panel{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -357,7 +419,7 @@ select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius
   <header class="topbar glass">
     <div class="brand">
       <img src="assets/otech.png" alt="OTECH">
-      <div><div class="brand-name">TORRE</div><div class="brand-sub">OTECH</div></div>
+      <div><div class="brand-name">AEROHUB</div><div class="brand-sub">LINK</div></div>
     </div>
     <div class="rule"></div>
     <nav class="fleet" id="fleet" aria-label="Flota"></nav>
@@ -379,6 +441,12 @@ select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius
           <path d="M4 4a2 2 0 0 1 2-2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
           <path d="M14 2v6h6M9 14h6M9 18h6"/></svg>
         <span>Bitácoras</span><span class="pill" id="pill-log">0</span>
+      </button>
+      <button class="vista-btn" data-vista="asistente" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.6-.7L3 21l1.9-5A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4Z"/>
+          <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg>
+        <span>Asistente</span>
       </button>
     </div>
 
@@ -446,8 +514,8 @@ select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
       </div></div>
-      <div><div class="node-title">Torre OTECH</div>
-        <div class="node-meta" id="n-torre">Esta máquina</div></div>
+      <div><div class="node-title">AeroHub Link</div>
+        <div class="node-meta" id="n-hub">Esta máquina</div></div>
     </div>
 
     <div class="rail-foot">
@@ -528,6 +596,54 @@ select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius
               <thead><tr><th>Aeronave</th><th>Archivo</th><th>Tamaño</th><th>Recibido</th><th></th></tr></thead>
               <tbody id="tabla-logs"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Vista: asistente ────────────────────────────────────────── -->
+    <div class="vista-pane" id="v-asistente">
+      <div class="chat glass">
+        <div class="chat-aviso">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A1.9 1.9 0 0 0 4 20.4h16a1.9 1.9 0 0 0 1.6-2.9L13.7 3.9a1.9 1.9 0 0 0-3.4 0Z"/>
+          </svg>
+          <span>El asistente <b>consulta y recomienda; no manda</b>. No tiene canal hacia las
+          aeronaves — armado, modo y retorno se ejecutan en la radio.</span>
+        </div>
+
+        <div class="hilo" id="hilo">
+          <div class="chat-vacio" id="chat-vacio">
+            <h3>Pregunta sobre la flota</h3>
+            <p>Leo el estado en vivo, los eventos MAVLink y el archivero de bitácoras.
+               Los umbrales de alarma los calcula el sistema, no yo.</p>
+            <div class="sugerencias">
+              <button class="sug">Resume el estado de la flota</button>
+              <button class="sug">¿Qué problemas hay ahora mismo?</button>
+              <button class="sug">Dame el resumen de vuelo de la 01</button>
+              <button class="sug">¿Cuál aeronave debo revisar primero?</button>
+              <button class="sug">Lista de inspección previa al vuelo</button>
+              <button class="sug">¿Qué bitácoras tengo archivadas?</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="compositor">
+          <div class="comp-caja">
+            <textarea id="pregunta" rows="1" placeholder="Pregunta sobre el estado, los eventos o las bitácoras…"
+                      aria-label="Pregunta al asistente"></textarea>
+            <button class="enviar" id="enviar" aria-label="Enviar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 12h15M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+          <div class="comp-pie">
+            <span class="estado-llm"><span class="dot" id="llm-dot"></span><span id="llm-txt">comprobando…</span></span>
+            <span>·</span>
+            <label>modelo <select id="llm-modelo"></select></label>
+            <span>·</span>
+            <span>corre en tu máquina; nada sale a internet</span>
+            <button class="mini" id="limpiar" style="margin-left:auto">Limpiar</button>
           </div>
         </div>
       </div>
@@ -944,13 +1060,14 @@ select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius
   function ponerVista(v) {
     vista = v;
     botonesVista.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.vista === v)); });
-    ["mapa", "camaras", "bitacoras"].forEach(function (k) {
+    ["mapa", "camaras", "bitacoras", "asistente"].forEach(function (k) {
       $("v-" + k).classList.toggle("on", k === v);
     });
     $("capa-panel").hidden = v !== "mapa";
     $("pip").hidden = v !== "mapa" || sel === null;
     if (v === "camaras") reconstruirMosaico();
     if (v === "bitacoras") cargarCatalogo();
+    if (v === "asistente") { estadoAgente(); $("pregunta").focus(); }
     if (v === "mapa") setTimeout(function () { map.invalidateSize(); }, 30);
   }
   botonesVista.forEach(function (b) {
@@ -1229,6 +1346,185 @@ select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius
   /* El navegador abriría el archivo soltado fuera de la zona; se le impide. */
   window.addEventListener("dragover", function (e) { e.preventDefault(); });
   window.addEventListener("drop", function (e) { e.preventDefault(); });
+
+  /* ── Asistente ──────────────────────────────────────────────────────
+     El modelo corre en Ollama, en esta máquina. Nada de lo que se escribe
+     aquí sale a internet, y el asistente no tiene ninguna ruta hacia las
+     aeronaves: consulta el mismo estado que pinta la consola.            */
+
+  var historial = [], respondiendo = false, modeloActivo = null;
+
+  function estadoAgente() {
+    fetch("api/agente").then(function (r) { return r.json(); }).then(function (d) {
+      var dot = $("llm-dot"), txt = $("llm-txt"), sel = $("llm-modelo");
+      if (!d.vivo) {
+        dot.className = "dot off";
+        txt.textContent = "Ollama no responde";
+        txt.title = d.fallo || "";
+        sel.innerHTML = "<option>—</option>";
+        return;
+      }
+      dot.className = "dot on";
+      txt.textContent = "modelo local";
+      modeloActivo = modeloActivo || d.modelo;
+      sel.innerHTML = "";
+      (d.modelos || []).forEach(function (m) {
+        var o = document.createElement("option");
+        o.value = m.nombre;
+        o.textContent = m.nombre + (m.params ? " · " + m.params : "");
+        sel.appendChild(o);
+      });
+      sel.value = modeloActivo;
+    }).catch(function () {
+      $("llm-dot").className = "dot off";
+      $("llm-txt").textContent = "sin respuesta del puente";
+    });
+  }
+  $("llm-modelo").addEventListener("change", function () { modeloActivo = this.value; });
+
+  function burbuja(quien, texto) {
+    var vac = $("chat-vacio"); if (vac) vac.remove();
+    var m = document.createElement("div");
+    m.className = "msg " + (quien === "yo" ? "yo" : "ia");
+    var av = document.createElement("div");
+    av.className = "msg-ava"; av.textContent = quien === "yo" ? "TÚ" : "AH";
+    var cu = document.createElement("div");
+    cu.className = "msg-cuerpo"; cu.textContent = texto || "";
+    m.appendChild(av); m.appendChild(cu);
+    $("hilo").appendChild(m);
+    $("hilo").scrollTop = $("hilo").scrollHeight;
+    return cu;
+  }
+
+  /* Se inserta por encima de la burbuja del modelo, nunca dentro: lo que dice
+     el sistema y lo que dice el modelo no se mezclan en el mismo bloque. */
+  function pintarAlarma(lista, burbujaIA) {
+    var caja = document.createElement("div");
+    caja.className = "alarma";
+    var tit = document.createElement("div");
+    tit.className = "alarma-tit";
+    tit.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A1.9 1.9 0 0 0 4 20.4h16a1.9 ' +
+      '1.9 0 0 0 1.6-2.9L13.7 3.9a1.9 1.9 0 0 0-3.4 0Z"/></svg>';
+    tit.appendChild(document.createTextNode(
+      lista.length + " hallazgo" + (lista.length === 1 ? "" : "s") + " crítico" + (lista.length === 1 ? "" : "s")));
+
+    var ul = document.createElement("ul");
+    lista.forEach(function (a) {
+      var li = document.createElement("li");
+      var et = document.createElement("span");
+      et.className = "et"; et.style.setProperty("--c", colorDe(a.sysid));
+      et.textContent = tagDe(a.sysid);
+      li.appendChild(et);
+      li.appendChild(document.createTextNode(a.nombre + " — " + a.texto));
+      ul.appendChild(li);
+    });
+
+    var pie = document.createElement("div");
+    pie.className = "alarma-pie";
+    pie.textContent = "Detectado por el sistema con los umbrales de la consola. No pasa por el modelo.";
+
+    caja.appendChild(tit); caja.appendChild(ul); caja.appendChild(pie);
+    var contenedor = burbujaIA.parentNode;
+    contenedor.parentNode.insertBefore(caja, contenedor);
+    $("hilo").scrollTop = $("hilo").scrollHeight;
+  }
+
+  function preguntar(texto) {
+    if (respondiendo || !texto.trim()) return;
+    respondiendo = true;
+    $("enviar").disabled = true;
+
+    burbuja("yo", texto);
+    var salida = burbuja("ia", "");
+    salida.classList.add("cursor-ia");
+
+    var acumulado = "";
+    var cuerpo = { mensaje: texto, historial: historial.slice(-12) };
+    if (modeloActivo) cuerpo.modelo = modeloActivo;
+
+    fetch("api/agente/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo)
+    }).then(function (r) {
+      if (!r.ok || !r.body) throw new Error("HTTP " + r.status);
+      var lector = r.body.getReader(), dec = new TextDecoder(), resto = "";
+
+      function seguir() {
+        return lector.read().then(function (res) {
+          if (res.done) return;
+          resto += dec.decode(res.value, { stream: true });
+          /* SSE separa eventos con línea en blanco; un trozo de red puede
+             cortar uno por la mitad, así que solo se procesa lo completo. */
+          var partes = resto.split("\n\n");
+          resto = partes.pop();
+          partes.forEach(function (bloque) {
+            var linea = bloque.split("\n").find(function (l) { return l.indexOf("data: ") === 0; });
+            if (!linea) return;
+            var d;
+            try { d = JSON.parse(linea.slice(6)); } catch (e) { return; }
+            if (d.error) {
+              salida.classList.add("msg-err");
+              salida.textContent = "⚠ " + d.error;
+              return;
+            }
+            if (d.alertas) { pintarAlarma(d.alertas, salida); return; }
+            if (d.texto) {
+              acumulado += d.texto;
+              salida.textContent = acumulado;
+              $("hilo").scrollTop = $("hilo").scrollHeight;
+            }
+            if (d.fin) {
+              var pie = document.createElement("div");
+              pie.className = "msg-meta";
+              pie.textContent = d.tokens + " tokens" +
+                (d.velocidad ? " · " + d.velocidad.toFixed(0) + " tok/s" : "") +
+                " · " + (modeloActivo || "modelo local");
+              salida.parentNode.appendChild(pie);
+            }
+          });
+          return seguir();
+        });
+      }
+      return seguir();
+    }).catch(function (e) {
+      salida.classList.add("msg-err");
+      salida.textContent = "⚠ No se pudo consultar al asistente: " + e.message;
+    }).finally(function () {
+      salida.classList.remove("cursor-ia");
+      if (acumulado) {
+        historial.push({ role: "user", content: texto });
+        historial.push({ role: "assistant", content: acumulado });
+        if (historial.length > 24) historial = historial.slice(-24);
+      }
+      respondiendo = false;
+      $("enviar").disabled = false;
+      $("hilo").scrollTop = $("hilo").scrollHeight;
+    });
+  }
+
+  var caja = $("pregunta");
+  function enviarAhora() { var t = caja.value; caja.value = ""; caja.style.height = "auto"; preguntar(t); }
+  $("enviar").addEventListener("click", enviarAhora);
+  caja.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarAhora(); }
+  });
+  caja.addEventListener("input", function () {
+    this.style.height = "auto";
+    this.style.height = Math.min(160, this.scrollHeight) + "px";
+  });
+  document.addEventListener("click", function (e) {
+    if (e.target.classList && e.target.classList.contains("sug")) preguntar(e.target.textContent);
+  });
+  $("limpiar").addEventListener("click", function () {
+    historial = [];
+    $("hilo").innerHTML = "";
+    var v = document.createElement("div");
+    v.className = "chat-vacio";
+    v.innerHTML = '<h3>Conversación limpia</h3><p>El asistente vuelve a partir del estado actual de la flota.</p>';
+    $("hilo").appendChild(v);
+  });
 
   /* ── Configuración de cámaras ───────────────────────────────────────── */
   fetch("api/camaras")

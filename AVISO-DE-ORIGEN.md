@@ -35,14 +35,40 @@ hoy comentado. **Si en algún momento se distribuye un binario cerrado, hay que
 activarlo o aceptar la GPL v3.** No es un problema mientras el código sea
 abierto, que es el caso aquí.
 
+### El modelo de lenguaje NO es software libre — leer antes de distribuir
+
+El asistente de `web-cloud/` consulta un modelo servido por **[Ollama]**
+(licencia MIT, sin problema). El modelo en sí es otra cosa:
+
+| Modelo | Licencia | Qué implica |
+|--------|----------|-------------|
+| **Llama 3.2** (el que usamos por omisión) | **Llama 3.2 Community License** — *no* es una licencia de código abierto aprobada por la OSI | Obliga a mostrar **«Built with Llama»**, a incluir el aviso de licencia, a nombrar los modelos derivados con el prefijo `Llama`, y a cumplir su política de uso aceptable. Además exige licencia aparte de Meta si el producto supera los 700 millones de usuarios activos mensuales. |
+| **Qwen3‑VL** (alternativa instalada) | Apache 2.0 | Sin restricciones de uso ni de escala. |
+
+Dos consecuencias prácticas:
+
+1. **Si el producto se distribuye o se comercializa con Llama por omisión**, hay
+   que poner el aviso «Built with Llama» en la interfaz y en la documentación. No
+   está puesto todavía.
+2. **La salida más limpia es cambiar el modelo por omisión a uno Apache 2.0**
+   —Qwen3‑VL ya está instalado, o Mistral, o Gemma bajo sus propios términos— y
+   dejar Llama como opción del usuario. El selector de modelo del chat ya lo
+   permite sin tocar código.
+
+Nada de esto afecta al uso interno en desarrollo, que es el caso hoy. Afecta al
+día que esto se entregue a un cliente o se presente como producto.
+
+[Ollama]: https://ollama.com
+
 ---
 
 ## Lo que es obra propia
 
 | Qué | Dónde | Naturaleza |
 |-----|-------|-----------|
-| **Torre OTECH** — puente MAVLink, analizador de protocolo, consola web multi‑aeronave, mosaico de cámaras, archivero de bitácoras | `web-cloud/` | Escrito desde cero. Sin framework, sin dependencias más allá de `ws` y Leaflet. |
+| **AeroHub Link** — puente MAVLink, analizador de protocolo, consola web multi‑aeronave, mosaico de cámaras, archivero de bitácoras | `web-cloud/` | Escrito desde cero. Sin framework, sin dependencias más allá de `ws` y Leaflet. |
 | **Analizador MAVLink v1/v2** | `web-cloud/mavlink.js` | Implementación propia, con CRC‑16/MCRF4XX validado contra el valor publicado del estándar. |
+| **Asistente en lenguaje natural** | `web-cloud/agente.js` | Motor de umbrales y hallazgos, generador de informe y puente con Ollama. El modelo es de terceros; el juicio de seguridad, el canal de alarma y la negativa a mandar son obra propia. |
 | **Identidad visual y tema** | `estacion-tierra/src/QmlControls/QGCPalette.cc`, iconos, splash | Rebranding OTECH sobre la estructura de QGC. |
 | **Consola MAVLink en la vista de vuelo** | `estacion-tierra/src/FlightDisplay/FlyViewMavlinkConsole.qml` | Componente nuevo, con ticker de telemetría dirigido por cambio. |
 | **Pantalla de arranque** | `estacion-tierra/src/UI/OtechSplashScreen.qml` | Componente nuevo. |

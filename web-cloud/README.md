@@ -1,4 +1,4 @@
-# Torre OTECH — despliegue local
+# AeroHub Link — despliegue local
 
 Capa de supervisión para OTECH-GroundStation, corriendo enteramente en tu máquina.
 
@@ -33,7 +33,7 @@ aviso se vean disparados de verdad):
 npm run demo
 ```
 
-## Las tres vistas
+## Las cuatro vistas
 
 El conmutador de la barra superior cambia el centro de la consola:
 
@@ -43,6 +43,7 @@ El conmutador de la barra superior cambia el centro de la consola:
 - **Cámaras** — mosaico con una baldosa por aeronave, todas a la vez, cada una
   con su altura, velocidad, rumbo y batería sobre la imagen.
 - **Bitácoras** — el archivero de registros de vuelo.
+- **Asistente** — consultas en lenguaje natural sobre todo lo anterior.
 
 Cada aeronave recibe un **color y una etiqueta de dos dígitos** derivados de su
 sysid, iguales en el mapa, en las pastillas de flota, en el mosaico y en la
@@ -112,6 +113,99 @@ contra la imagen**. El retardo de red es variable y no acotado, y eso no cambia
 por que la imagen se vea fluida.
 
 [MediaMTX]: https://github.com/bluenviron/mediamtx
+
+---
+
+## Asistente en lenguaje natural
+
+Vista **Asistente**. Pregunta en español sobre el estado de la flota, los
+problemas abiertos, los resúmenes de vuelo, las incidencias, las inspecciones
+y el archivero de bitácoras.
+
+Corre sobre **[Ollama] en tu máquina**. Nada de lo que escribes sale a
+internet, y el asistente ve exactamente el mismo estado que pinta la consola —
+no hay una fuente de verdad paralela que pueda desincronizarse.
+
+```bash
+ollama serve            # si no está ya corriendo como servicio
+ollama pull llama3.2    # 1.9 GB
+```
+
+| Variable | Por omisión | Qué hace |
+|----------|-------------|----------|
+| `OTECH_LLM_HOST` | `http://127.0.0.1:11434` | Dónde escucha Ollama |
+| `OTECH_LLM_MODEL` | `llama3.2:latest` | Modelo por omisión |
+| `OTECH_LLM_TEMP` | `0.25` | Temperatura |
+| `OTECH_LLM_MAX` | `700` | Tope de tokens por respuesta |
+
+El selector del pie del chat permite cambiar de modelo sin reiniciar.
+
+[Ollama]: https://ollama.com
+
+### El juicio de seguridad vive en el código, no en el modelo
+
+Es la decisión de diseño que gobierna todo `agente.js`, y no es teórica.
+Durante el desarrollo, con un RSSI de **-92 dBm** presente en el informe,
+llama3.2 respondió *«no hay problemas críticos en la flota»* y acto seguido se
+inventó una pérdida de GNSS que no existía. Un modelo de 3B no puede ser el
+canal de alarma de una estación de control.
+
+Así que no lo es:
+
+- **`revisar()` evalúa los umbrales**, los mismos que colorean los
+  instrumentos de la consola. Batería < 20 % crítico y < 35 % aviso; RSSI
+  < -90 dBm crítico y < -75 dBm aviso; menos de 6 satélites crítico; HDOP > 2
+  aviso. Si cambian ahí, cambian aquí: dos criterios distintos en un mismo
+  producto son un defecto, no una opción.
+- **Las alarmas críticas se emiten antes que el modelo y sin pasar por él.**
+  Aparecen en una tarjeta roja propia, separada de la burbuja de la respuesta.
+  Lo que dice el sistema y lo que dice el modelo no se mezclan nunca en el
+  mismo bloque.
+- **Los hallazgos van al principio del informe**, antes que ninguna ficha. Un
+  modelo pequeño atiende mucho mejor al inicio del contexto que a su mitad.
+
+Con eso, la prosa del modelo pasó a coincidir con la alarma. Pero la garantía
+no es que coincida: es que **la tarjeta sale igual aunque el modelo se
+equivoque**.
+
+### El asistente no manda
+
+No existe ninguna ruta desde el asistente hacia las aeronaves. Si le pides
+armar, despegar, cambiar de modo o retornar, **no lo hace y no dice que lo
+haya hecho**: describe la acción que debe ejecutar el operador en la radio y
+por qué. Es la hipótesis S-1 aplicada a la capa de lenguaje, por las mismas
+razones por las que el socket UDP nunca llama a `send()`.
+
+Un modelo de lenguaje interpretando «bájalo» y transmitiendo un comando añade
+un modo de fallo —la mala interpretación— que ninguna evaluación de seguridad
+de este sistema contempla hoy.
+
+### Qué esperar de un modelo pequeño
+
+llama3.2 de 3B da unos **56 tok/s** en esta máquina; una respuesta típica tarda
+de 3 a 15 segundos. Es bueno redactando y relacionando datos que ya tiene
+delante, y flojo razonando por su cuenta: en pruebas llegó a llamar «1.4 %» a
+un HDOP, que no tiene unidades. Trátalo como un redactor con el informe en la
+mano, no como un analista.
+
+`qwen3-vl:8.8B` también está disponible y razona mejor, pero da 20 tok/s y es
+un modelo de razonamiento: gasta el presupuesto de tokens en pensar antes de
+responder. Para chat interactivo, llama3.2 es la elección.
+
+### API
+
+| Método | Ruta | Qué hace |
+|--------|------|----------|
+| `GET` | `/api/agente` | Estado de Ollama, modelo activo, catálogo y umbrales |
+| `GET` | `/api/agente/informe` | El informe exacto que se le entrega al modelo |
+| `POST` | `/api/agente/chat` | Pregunta; responde por SSE, token a token |
+
+`/api/agente/informe` es la herramienta de diagnóstico: si una respuesta te
+sorprende, mira primero qué vio el modelo.
+
+Va por SSE y no por el WebSocket de telemetría a propósito: una respuesta
+larga bloquearía las tramas de vuelo, y esas tienen prioridad sobre cualquier
+conversación.
 
 ---
 
@@ -251,18 +345,23 @@ salen de las cabeceras MAVLink que compila el propio proyecto.
 | Archivo | Qué hace |
 |---------|----------|
 | `mavlink.js` | Analizador v1/v2 sin dependencias; 9 mensajes decodificados |
+| `agente.js` | Umbrales, hallazgos, informe y puente con Ollama |
 | `bridge.js` | Ingesta UDP, estado de flota, WebSocket, servidor web, API, MariaDB |
-| `web/index.html` | La consola: mapa, mosaico de cámaras y archivero |
+| `web/index.html` | La consola: mapa, cámaras, archivero y asistente |
 | `camaras.json.ejemplo` | Plantilla para declarar flujos de video reales |
 | `schema.sql` | Esquema de MariaDB |
 | `prueba-mavlink.js` | Pruebas del analizador |
+| `prueba-agente.js` | Pruebas de umbrales y del canal de alarma |
 | `prueba-extremo.js` | Prueba de extremo a extremo |
 | `logs/` | Bitácoras subidas. Fuera de git. |
 
 ## Aún no hecho
 
 - **Autenticación** — hoy cualquiera en tu red alcanza el 8080 y el 8081, y eso
-  ahora incluye borrar bitácoras
+  ahora incluye borrar bitácoras y consumir el modelo
+- El asistente no lee el contenido de los `.ulg`, solo su catálogo: para
+  resumir un vuelo pasado hace falta decodificarlos o leer el histórico de
+  MariaDB, y hoy no hace ninguna de las dos
 - Repetidor WebRTC para video de baja latencia (ver arriba)
 - Trazado de la misión planeada sobre el mapa (requiere leer `MISSION_ITEM_INT`)
 - Escritura de eventos a la tabla `eventos` (el esquema ya está; falta cablearlo)

@@ -20,7 +20,7 @@ La plataforma de software se llama **OTECH‑GroundStation** y son tres piezas
 sobre un mismo protocolo:
 
 ```
-Aeronave ──RF──▶ Radio SIYI / Estación de escritorio ──UDP──▶ Torre OTECH ──▶ navegador
+Aeronave ──RF──▶ Radio SIYI / Estación de escritorio ──UDP──▶ AeroHub Link ──▶ navegador
   PX4              (mando y control)                        (supervisión)
 ```
 
@@ -29,7 +29,7 @@ Aeronave ──RF──▶ Radio SIYI / Estación de escritorio ──UDP──�
 | [`app-escritorio/`](app-escritorio/) | Estación de tierra en Windows: planificación, vuelo, calibración, video | Compila y corre; verificado contra PX4 real |
 | [`app-movil/`](app-movil/) | La misma estación en el radio control SIYI (Android) | Compila, se instala y corre en el radio |
 | [`estacion-tierra/`](estacion-tierra/) | El código fuente que comparten las dos anteriores | — |
-| [`web-cloud/`](web-cloud/) | **Torre OTECH**: supervisión multi‑aeronave en el navegador, mosaico de cámaras y archivero de bitácoras | Funciona en local; código propio |
+| [`web-cloud/`](web-cloud/) | **AeroHub Link**: supervisión multi‑aeronave en el navegador, mosaico de cámaras, archivero de bitácoras y asistente en lenguaje natural | Funciona en local; código propio |
 | [`documentacion/`](documentacion/) | Marco normativo aeronáutico y compatibilidad de hardware | 53 páginas + resúmenes |
 
 **Escritorio y móvil comparten un único árbol fuente.** Se compilan del mismo
@@ -61,6 +61,13 @@ NOM‑107, obliga a demostrar rendimiento de enlace requerido (ICAO Doc 10019)
 sobre una red que no garantiza latencia, y convierte una fuga de información en
 un control de la aeronave. Es defendible ante un jurado y ante la autoridad; lo
 contrario no.
+
+La misma regla gobierna el asistente: **consulta y recomienda; no manda**. Y por
+la misma razón, **el juicio de seguridad vive en el código y no en el modelo** —
+los umbrales de alarma los evalúa `web-cloud/agente.js` y las alarmas críticas se
+emiten sin pasar por el modelo. No es cautela abstracta: durante el desarrollo,
+con un RSSI de ‑92 dBm en el informe, el modelo respondió «no hay problemas
+críticos». Está documentado en [`web-cloud/README.md`](web-cloud/README.md).
 
 ---
 

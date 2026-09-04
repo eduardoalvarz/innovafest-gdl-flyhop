@@ -91,7 +91,7 @@ en el radio (`JoystickAndroid.cc`).
 
 ---
 
-## Torre OTECH (la capa web)
+## AeroHub Link (la capa web)
 
 `web-cloud/` no habla con el hardware. Recibe MAVLink reenviado por la
 estación, así que su compatibilidad es la de la estación.
@@ -104,9 +104,26 @@ estación, así que su compatibilidad es la de la estación.
 | Servidor | Node.js ≥ 18 |
 | Navegador | Cualquiera con WebSocket y `<canvas>` |
 | Base de datos | MariaDB / MySQL, opcional (XAMPP sirve) |
+| Asistente | Ollama en `127.0.0.1:11434`, opcional |
 
 **No emite hacia la aeronave.** El socket UDP nunca llama a `send()`, conforme
-a la hipótesis S‑1.
+a la hipótesis S‑1. El asistente tampoco: consulta y recomienda.
+
+### Asistente en lenguaje natural
+
+Corre en la misma máquina; sin él, la consola funciona igual y solo falta esa
+vista. Verificado con **Ollama 0.17.1** y estos modelos:
+
+| Modelo | Tamaño | Velocidad medida | Apto para chat |
+|--------|--------|------------------|----------------|
+| `llama3.2` 3.2B Q4_K_M | 1.9 GB | ~56 tok/s | Sí — es el de omisión |
+| `qwen3-vl` 8.8B Q4_K_M | 5.7 GB | ~20 tok/s | Razona mejor, pero es un modelo de razonamiento: consume el presupuesto de tokens pensando antes de responder |
+
+Medido en la máquina de desarrollo, sin GPU dedicada declarada. Un equipo con
+menos memoria puede no cargar el de 8.8B.
+
+**Atención a la licencia del modelo**, que no es de código abierto en el caso
+de Llama: ver `../../AVISO-DE-ORIGEN.md`.
 
 ### Conectar la estación a la torre
 
@@ -143,8 +160,9 @@ Lo que hace falta para **compilar**, que es bastante más que para ejecutar.
 2. **iOS no está contemplado.**
 3. **El video no llega al SIYI.** Sin diagnosticar.
 4. **`web-cloud/` no tiene autenticación.** Cualquiera en la red local alcanza
-   los puertos 8080 y 8081, y eso incluye borrar bitácoras. Es lo primero que
-   hay que resolver antes de exponerlo fuera de un puesto de operación.
+   los puertos 8080 y 8081, y eso incluye borrar bitácoras y consumir el
+   modelo. Es lo primero que hay que resolver antes de exponerlo fuera de un
+   puesto de operación.
 5. **Solo una ABI de Android** (`arm64-v8a`). Aparatos de 32 bits quedan fuera.
 6. **No hay instalador firmado** para escritorio, ni clave de publicación para
    Android; hoy se firma con la clave de depuración.
