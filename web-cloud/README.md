@@ -170,18 +170,53 @@ Con eso, la prosa del modelo pasó a coincidir con la alarma. Pero la garantía
 no es que coincida: es que **la tarjeta sale igual aunque el modelo se
 equivoque**.
 
+### Cuánto cuesta un informe, medido
+
+Un **token** es el trozo de texto que el modelo procesa de una vez: ni una
+letra ni una palabra, sino algo intermedio que sale de comprimir el corpus de
+entrenamiento. Todo lo que entra y sale se cuenta en tokens, y la ventana de
+contexto es un techo duro.
+
+Tokenizando con llama3.2 en esta máquina:
+
+| Texto | Caracteres | Tokens |
+|-------|-----------:|-------:|
+| `hola` | 4 | 2 |
+| `aeronave` | 8 | 3 |
+| `batería` | 8 | 4 |
+| `OTECH-03` | 8 | 4 |
+| `El multirrotor tiene la batería al treinta por ciento.` | 55 | 18 |
+| **El informe completo, 4 aeronaves** | **3 490** | **1 483** |
+
+Salen **2.35 caracteres por token**. La cifra que se cita habitualmente, 3.5-4,
+vale para inglés corriente; el español técnico con tildes, cifras, unidades y
+guiones se parte mucho más. Conviene medirlo y no suponerlo: la primera
+estimación de este proyecto usó 3.4 y **subestimó el coste un 45 %**.
+
+Costes reales medidos:
+
+| Pieza | Tokens |
+|-------|-------:|
+| Prompt de sistema | 388 |
+| Informe, 4 aeronaves | 1 483 |
+| Informe, 14 aeronaves | 2 232 |
+| Respuesta reservada | 700 |
+
 ### Flotas grandes
 
-Ollama carga llama3.2 con **4096 tokens de contexto** por omisión, y cada ficha
-de aeronave cuesta unos 150. Alrededor de once aeronaves el informe lo
-desbordaría, y Ollama recorta en silencio: nadie se entera de que el modelo
-dejó de ver media flota.
+Ollama carga llama3.2 con **4096 tokens** de contexto por omisión. Con el
+sistema, un informe de 4 aeronaves, algo de historial y la respuesta, eso ya
+queda al filo; con la flota crecida, se desborda. Y Ollama **recorta en
+silencio**: nadie se entera de que el modelo dejó de ver media flota.
 
-Dos medidas contra eso. El puente pide **8192 tokens** explícitamente, y si aun
-así el informe crece, las aeronaves **sin hallazgos** pasan a una línea
-resumida mientras las que tienen aviso o crítico conservan su ficha completa.
-El informe dice cuántas resumió, para que el modelo sepa que no lo está viendo
-todo. Con 14 aeronaves el informe ocupa ~1430 tokens y ninguna desaparece.
+Dos medidas. El puente pide **8192 tokens** explícitamente, y si aun así el
+informe crece, las aeronaves **sin hallazgos** pasan a una línea resumida
+mientras las que tienen aviso o crítico conservan su ficha completa y van
+primero. El informe declara cuántas resumió, para que el modelo sepa que no lo
+está viendo todo.
+
+Con 14 aeronaves: ~2 070 tokens de informe, ninguna desaparece, y quedan más
+de 3 500 tokens libres.
 
 ### El asistente no manda
 

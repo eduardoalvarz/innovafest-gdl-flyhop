@@ -119,8 +119,15 @@ comprueba("las aeronaves con hallazgo conservan ficha completa",
 comprueba("las sanas sobrantes se resumen en vez de truncarse en silencio",
   /AERONAVE\(S\) SIN HALLAZGOS, EN RESUMEN/.test(infG));
 
-comprueba("el informe cabe holgadamente en 4096 tokens",
-  infG.length / 3.4 < 2000, Math.round(infG.length / 3.4) + " tokens con 14 aeronaves");
+/* 2.35 car/token es una medida real: se tokenizó el informe con llama3.2 y se
+   comparó. La cifra habitual de 3.4 subestimaba el coste un 45 %, porque el
+   español técnico con tildes, cifras y unidades se parte mucho más que el
+   inglés corriente. */
+const CAR_POR_TOKEN = 2.35;
+const tokG = Math.round(infG.length / CAR_POR_TOKEN);
+comprueba("el informe deja sitio a sistema, historial y respuesta en 8192",
+  tokG + 388 + 1500 + 700 < 8192,
+  tokG + " tok de informe + 388 sistema + 1500 historial + 700 respuesta");
 
 comprueba("ninguna aeronave desaparece del informe",
   (function () {

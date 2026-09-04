@@ -26,11 +26,19 @@ const CFG = {
   maxTok:   Number(process.env.OTECH_LLM_MAX  || 700),
   ctx:      Number(process.env.OTECH_LLM_CTX  || 8192),
   turnos:   6,           // pares pregunta/respuesta que se conservan
-  /* Presupuesto de caracteres para las fichas detalladas. Por encima de esto
-     las aeronaves sanas pasan a una línea resumida. El modelo carga por
-     omisión con 4096 tokens de contexto, y a ~150 tokens por ficha una flota
-     de once aeronaves lo desborda; Ollama recortaría entonces en silencio, y
-     un informe truncado sin avisar es peor que uno resumido con aviso. */
+  /* Presupuesto de caracteres para las fichas detalladas; por encima, las
+     aeronaves sanas pasan a una línea resumida.
+
+     El número sale de una medición, no de una regla general. Tokenizando el
+     informe real con llama3.2 salen 2.35 caracteres por token: el texto
+     técnico en español —tildes, cifras, unidades, guiones— se parte mucho más
+     de lo que sugiere la cifra habitual de 3.5-4 que vale para inglés
+     corriente. Con eso, 4200 caracteres son ~1790 tokens de fichas.
+
+     Importa porque el modelo carga por omisión con 4096 tokens de contexto y
+     Ollama recorta en silencio al desbordarlo: el modelo respondería sobre
+     media flota creyendo verla entera. De ahí el num_ctx explícito de abajo
+     y este tope. */
   fichasMax: Number(process.env.OTECH_LLM_FICHAS || 4200)
 };
 
