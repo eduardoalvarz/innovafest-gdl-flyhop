@@ -384,11 +384,43 @@ Alternativa: reaprovechar la caché de teselas que el propio GCS ya mantiene
 
 ---
 
+## Seguridad
+
+### Cerrado
+
+Cuatro agujeros encontrados en una revisión y corregidos. Cada uno tiene su
+prueba de regresión en `prueba-seguridad.js`.
+
+| Fallo | Qué permitía | Cierre |
+|-------|--------------|--------|
+| **Fuga de archivos** | `GET //../webSECRETO/x` devolvía 200 con el contenido. `//x` normaliza en Windows a la ruta UNC `\\x` y `path.join` la dejaba salir de `web/`; encima, `startsWith(base)` sin separador daba por bueno un hermano con el mismo prefijo. | `rutaSegura()`: colapsa los separadores iniciales, resuelve con `path.resolve` y compara contra `base + separador` |
+| **CSRF** | Cualquier web abierta en el navegador del operador podía subir bitácoras y disparar inferencias. Sin cookies de por medio: no hay sesión que robar, basta con que la petición salga de dentro de la red. | Se valida `Origin` |
+| **DNS rebinding** | Un dominio del atacante que resolviera a `127.0.0.1` alcanzaba la API, saltándose que el puerto solo escuche en local. | Se valida `Host` contra una lista de la máquina |
+| **WebSocket abierto** | Cualquier página leía la telemetría completa, posiciones incluidas. | `verifyClient` con las mismas dos comprobaciones |
+
+Si accedes a la consola por un nombre propio (no `localhost` ni una IP de esta
+máquina), decláralo en `OTECH_HOSTS`, separado por comas.
+
+### Abierto — y esto importa
+
+Lo anterior cierra el ataque **desde el navegador**. No cierra el de alguien
+que ya está en tu red.
+
+- **No hay autenticación.** Cualquiera en la red que sepa la dirección puede,
+  con `curl`, leer telemetría, descargar y borrar bitácoras y consumir la GPU.
+- **No hay TLS.** Todo viaja en claro.
+- **MAVLink no va firmado.** Se pueden inyectar tramas en el 14550 y falsear
+  lo que ve el supervisor. No permite volar la aeronave —el puente nunca
+  emite— pero sí hacer que quien decide, decida mal.
+- **No hay cuota total del archivero.** Hay tope por archivo, no por disco.
+- **No hay límite de consultas simultáneas** al modelo.
+
 ## Pruebas
 
 ```bash
 npm test               # analizador MAVLink: CRC, decodificación, resincronía
-node prueba-extremo.js # UDP -> puente -> WebSocket, con el puente corriendo
+node prueba-extremo.js    # UDP -> puente -> WebSocket, con el puente corriendo
+node prueba-seguridad.js  # fuga de rutas, CSRF, DNS rebinding, WebSocket
 ```
 
 El primero contrasta el CRC contra el valor publicado de CRC-16/MCRF4XX
@@ -410,6 +442,7 @@ salen de las cabeceras MAVLink que compila el propio proyecto.
 | `prueba-mavlink.js` | Pruebas del analizador |
 | `prueba-agente.js` | Pruebas de umbrales y del canal de alarma |
 | `prueba-extremo.js` | Prueba de extremo a extremo |
+| `prueba-seguridad.js` | Regresión de los cuatro agujeros cerrados |
 | `logs/` | Bitácoras subidas. Fuera de git. |
 
 ## Aún no hecho

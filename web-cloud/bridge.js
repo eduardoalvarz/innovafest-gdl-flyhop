@@ -14,6 +14,7 @@
 const dgram = require("dgram");
 const http = require("http");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { WebSocketServer } = require("ws");
 const { MavlinkParser, SEVERITY, FIX_TYPE, MAV_TYPE, px4Mode } = require("./mavlink");
@@ -391,6 +392,42 @@ function api(req, res, ruta) {
   json(res, 405, { error: "método no admitido" });
 }
 
+/* ── Control de origen ────────────────────────────────────────────────────
+   Tres agujeros de la misma familia: el puente atendía a cualquiera que
+   supiera su dirección.
+
+   · DNS rebinding — sin validar `Host`, un dominio del atacante que resuelva
+     a 127.0.0.1 alcanza esta API desde el navegador de la víctima, saltándose
+     que el puerto solo escuche en la red local.
+   · CSRF — sin validar `Origin`, cualquier web dispara POST simples contra el
+     archivero de bitácoras y contra el modelo. No hacen falta cookies: aquí no
+     hay sesión que robar, basta con que la petición salga del navegador de
+     quien está dentro de la red.
+   · WebSocket — sin validar `Origin`, cualquier página abierta en ese
+     navegador lee la telemetría completa, posiciones incluidas.
+
+   Esto NO sustituye a la autenticación, que sigue pendiente: cierra el ataque
+   desde el navegador, no el de alguien que ya tiene acceso a la red.          */
+
+const HOSTS_OK = new Set(["localhost", "127.0.0.1", "::1"]);
+for (const iface of Object.values(os.networkInterfaces() || {}))
+  for (const dir of iface || []) if (!dir.internal) HOSTS_OK.add(dir.address.toLowerCase());
+for (const extra of String(process.env.OTECH_HOSTS || "").split(",").map((s) => s.trim()).filter(Boolean))
+  HOSTS_OK.add(extra.toLowerCase());
+
+function hostPermitido(cabecera) {
+  if (!cabecera) return false;
+  let h = String(cabecera).toLowerCase().trim();
+  if (h.startsWith("[")) h = h.slice(1, h.indexOf("]"));   // IPv6 entre corchetes
+  else h = h.replace(/:\d+$/, "");                          // quita el puerto
+  return HOSTS_OK.has(h);
+}
+
+function origenPermitido(origen) {
+  if (!origen) return true;      // curl, y las peticiones del mismo origen que no lo mandan
+  try { return hostPermitido(new URL(origen).host); } catch (e) { return false; }
+}
+
 /* ── Servidor web para la consola ─────────────────────────────────────── */
 
 const MIME = {
@@ -401,10 +438,45 @@ const MIME = {
 
 const VENDOR = path.join(__dirname, "node_modules", "leaflet", "dist");
 
+/* Resuelve una ruta pedida dentro de `base`, o null si se sale.
+
+   Dos trampas, y las dos hacían falta a la vez para que se filtrara un
+   archivo de fuera:
+
+   1. `//x` normaliza en Windows a la ruta UNC `\\x`, y `path.join` la deja
+      escapar del directorio base. Por eso se colapsan los separadores
+      iniciales antes de resolver.
+   2. `destino.startsWith(base)` sin separador da por bueno un hermano que
+      comparta prefijo: `...\local\webSECRETO` empieza por `...\local\web`.
+      Comprobado: `GET //../webSECRETO/llaves.txt` devolvía 200 con el
+      contenido del archivo. */
+function rutaSegura(base, sub) {
+  if (sub.indexOf("\0") >= 0) return null;
+  const limpio = sub.replace(/\\/g, "/").replace(/^\/+/, "");
+  const destino = path.resolve(base, limpio);
+  if (destino !== base && !destino.startsWith(base + path.sep)) return null;
+  return destino;
+}
+
 const web = http.createServer((req, res) => {
-  let rel = decodeURIComponent(req.url.split("?")[0]);
+  if (!hostPermitido(req.headers.host)) {
+    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("403 — cabecera Host no reconocida.\n" +
+            "Si accedes por un nombre propio, añádelo a OTECH_HOSTS.\n");
+    return;
+  }
+  if (!origenPermitido(req.headers.origin)) {
+    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("403 — origen cruzado no permitido.\n");
+    return;
+  }
+
+  let rel;
+  try { rel = decodeURIComponent(req.url.split("?")[0]); }
+  catch (e) { res.writeHead(400).end("400"); return; }   // %-escapes rotos
+
   if (rel.startsWith("/api/")) return api(req, res, rel);
-  if (rel === "/") rel = "/index.html";
+  if (rel === "/" || rel === "") rel = "/index.html";
 
   // Leaflet se sirve desde node_modules en vez de un CDN, para que la consola
   // levante sin internet. Las teselas sí necesitan red, salvo que se use un
@@ -415,8 +487,8 @@ const web = http.createServer((req, res) => {
     sub = rel.slice("/vendor/leaflet".length);
   }
 
-  const destino = path.join(base, path.normalize(sub));
-  if (!destino.startsWith(base)) { res.writeHead(403).end("403"); return; }
+  const destino = rutaSegura(base, sub);
+  if (!destino) { res.writeHead(403, { "Content-Type": "text/plain" }).end("403"); return; }
 
   fs.readFile(destino, (err, data) => {
     if (err) { res.writeHead(404, { "Content-Type": "text/plain" }).end("404"); return; }
@@ -446,7 +518,12 @@ web.listen(CFG.webPort, () => {
 
 /* ── WebSocket hacia el navegador ─────────────────────────────────────── */
 
-const wss = new WebSocketServer({ port: CFG.wsPort });
+/* Mismo control que en HTTP: sin esto, cualquier página abierta en el
+   navegador del operador se suscribe y lee la telemetría entera. */
+const wss = new WebSocketServer({
+  port: CFG.wsPort,
+  verifyClient: (info) => origenPermitido(info.origin) && hostPermitido(info.req.headers.host)
+});
 wss.on("error", puertoOcupado("WebSocket", CFG.wsPort));
 console.log("  Datos     ws://localhost:" + CFG.wsPort + "/");
 
