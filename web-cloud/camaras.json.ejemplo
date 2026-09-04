@@ -1,0 +1,16 @@
+{
+  "_comentario": [
+    "Copia este archivo como camaras.json para declarar flujos de video reales.",
+    "Cada clave es el sysid de la aeronave. Sin entrada, la consola dibuja la",
+    "vista representativa y la rotula SIMULADO.",
+    "",
+    "tipo 'mjpeg'  -> se pinta en un <img>. Lo produce ffmpeg sin más piezas.",
+    "tipo 'archivo'-> se pinta en un <video>: .mp4 o .webm, sirve para ensayos.",
+    "",
+    "RTSP y HLS no los reproduce el navegador por sí solo. Para latencia baja",
+    "hace falta un repetidor WebRTC (MediaMTX, Apache-2.0) delante; ver README."
+  ],
+
+  "1": { "tipo": "mjpeg",   "url": "http://127.0.0.1:8090/otech01.mjpg" },
+  "2": { "tipo": "archivo", "url": "assets/vuelo-ejemplo.mp4" }
+}

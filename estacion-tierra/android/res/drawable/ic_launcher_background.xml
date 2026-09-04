@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Background layer of the OTECH adaptive launcher icon.
+
+    Reproduces the navy field the mark sits on in resources/icons/qgroundcontrol.png
+    rather than pointing at that bitmap: the launcher shifts the two layers against
+    each other for the parallax effect, so the background has to keep looking right
+    when it is offset. A gradient does, a cropped photo of one would not.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:type="radial"
+        android:centerX="0.5"
+        android:centerY="0.5"
+        android:gradientRadius="76dp"
+        android:startColor="#0D0D44"
+        android:endColor="#16165C" />
+</shape>

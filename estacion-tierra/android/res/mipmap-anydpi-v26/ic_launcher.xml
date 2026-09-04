@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    OTECH adaptive launcher icon (API 26+). minSdk is 28, so this is the only
+    definition of @mipmap/ic_launcher that is ever needed - there is deliberately
+    no legacy mipmap-<density>/ic_launcher.png fallback.
+
+    drawable/icon.png is left alone and still carries the full square artwork: it
+    is what drawable/splashscreen.xml draws.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <!-- Themed icons (Android 13+) tint by alpha, so the cyan foreground works as is. -->
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

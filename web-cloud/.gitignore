@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+*.log
+
+# Bitácoras subidas por la consola: son datos de vuelo, no código.
+logs/
+
+# Configuración local de flujos de video (parte de camaras.json.ejemplo).
+camaras.json

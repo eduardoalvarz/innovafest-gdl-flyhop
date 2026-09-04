@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torre OTECH</title>
+<link rel="icon" href="assets/otech.png">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* Torre OTECH — consola de supervisión local.
+   Paleta derivada de la identidad ya aplicada al GCS: navy #0F1B3D, cian #1E98C1.
+   Los neutros llevan sesgo azul a propósito. */
+
+:root {
+  --ground:#E9EEF6; --panel:rgba(255,255,255,.74); --panel-solid:#F7F9FC;
+  --panel-edge:rgba(15,27,61,.14);
+  --ink:#0B1730; --ink-soft:#33436F; --muted:#5F739A; --muted-dim:#8B9CBB;
+  --brand:#14789C; --brand-bright:#1E98C1; --brand-wash:rgba(30,152,193,.12);
+  --ok:#1F9D57; --warn:#B57E00; --alert:#D8541F; --crit:#C81E1E;
+  --shadow:0 2px 10px rgba(11,23,48,.08),0 12px 34px rgba(11,23,48,.10);
+  --font-display:"Saira Condensed","Arial Narrow",sans-serif;
+  --font-body:"Barlow",-apple-system,"Segoe UI",sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:#070E1F; --panel:rgba(16,31,66,.62); --panel-solid:#101F42;
+    --panel-edge:rgba(120,165,215,.20);
+    --ink:#E6EEF9; --ink-soft:#B9CCE6; --muted:#7E93B4; --muted-dim:#56688A;
+    --brand:#1E98C1; --brand-bright:#4FC3E8; --brand-wash:rgba(79,195,232,.14);
+    --ok:#5FD67F; --warn:#FFBF00; --alert:#FF7A45; --crit:#FF4D4D;
+    --shadow:0 2px 10px rgba(0,0,0,.35),0 14px 40px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#070E1F; --panel:rgba(16,31,66,.62); --panel-solid:#101F42;
+  --panel-edge:rgba(120,165,215,.20);
+  --ink:#E6EEF9; --ink-soft:#B9CCE6; --muted:#7E93B4; --muted-dim:#56688A;
+  --brand:#1E98C1; --brand-bright:#4FC3E8; --brand-wash:rgba(79,195,232,.14);
+  --ok:#5FD67F; --warn:#FFBF00; --alert:#FF7A45; --crit:#FF4D4D;
+  --shadow:0 2px 10px rgba(0,0,0,.35),0 14px 40px rgba(0,0,0,.45);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--font-body);font-size:14px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;overflow:hidden}
+
+.eyebrow{font-family:var(--font-display);font-weight:600;font-size:11px;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.num{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+
+.console{position:relative;height:100vh;display:grid;
+  grid-template-columns:236px 1fr 300px;grid-template-rows:56px 1fr;gap:12px;padding:12px}
+
+#map{position:absolute;inset:0;z-index:0;background:var(--ground)}
+.console>*{position:relative;z-index:1}
+
+.glass{background:var(--panel);backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  border:1px solid var(--panel-edge);border-radius:14px;box-shadow:var(--shadow)}
+
+/* Barra superior */
+.topbar{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:0 14px}
+.brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.brand img{width:30px;height:30px;display:block}
+.brand-name{font-family:var(--font-display);font-weight:700;font-size:19px;
+  letter-spacing:.055em;line-height:1}
+.brand-sub{font-family:var(--font-display);font-weight:500;font-size:10px;
+  letter-spacing:.19em;color:var(--brand);line-height:1;margin-top:3px}
+.rule{width:1px;height:28px;background:var(--panel-edge);flex-shrink:0}
+.spacer{flex:1}
+
+.fleet{display:flex;gap:5px;align-items:center;overflow-x:auto;min-width:0;
+  scrollbar-width:none}
+.fleet::-webkit-scrollbar{display:none}
+.craft{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 7px;border-radius:7px;
+  border:1px solid transparent;background:none;cursor:pointer;font-family:var(--font-body);
+  font-size:13px;color:var(--muted);white-space:nowrap;transition:.15s}
+.craft:hover{background:var(--brand-wash);color:var(--ink-soft)}
+.craft[aria-pressed="true"]{background:var(--brand-wash);border-color:var(--c);
+  color:var(--ink);font-weight:600}
+.craft:focus-visible{outline:2px solid var(--brand-bright);outline-offset:2px}
+.craft-tag{font-family:var(--font-data);font-size:10.5px;font-weight:500;
+  padding:1px 5px;border-radius:4px;color:#08121f;background:var(--c);line-height:1.5}
+.craft-off .craft-tag{background:var(--muted-dim)}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--muted-dim)}
+.dot.on{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent)}
+.dot.off{background:var(--crit)}
+
+/* Conmutador de vista */
+.vistas{display:flex;gap:2px;padding:3px;border-radius:9px;flex-shrink:0;
+  border:1px solid var(--panel-edge);background:color-mix(in srgb,var(--muted) 8%,transparent)}
+.vista-btn{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:6px;
+  border:none;background:none;cursor:pointer;color:var(--muted);
+  font-family:var(--font-display);font-weight:600;font-size:12px;letter-spacing:.06em;
+  text-transform:uppercase}
+.vista-btn svg{width:14px;height:14px}
+.vista-btn:hover{color:var(--ink-soft)}
+.vista-btn[aria-pressed="true"]{background:var(--panel-solid);color:var(--ink);
+  box-shadow:0 1px 3px rgba(11,23,48,.14)}
+.vista-btn:focus-visible{outline:2px solid var(--brand-bright);outline-offset:1px}
+.pill{font-family:var(--font-data);font-size:10px;padding:0 5px;border-radius:99px;
+  background:var(--brand-wash);color:var(--brand-bright)}
+
+.mode-badge{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--brand) 45%,transparent);
+  background:var(--brand-wash);flex-shrink:0}
+.mode-badge .eyebrow{color:var(--brand-bright);font-size:10px}
+.mode-badge svg{width:13px;height:13px}
+
+.utc{text-align:right;flex-shrink:0}
+.utc .clock{font-family:var(--font-data);font-size:15px;font-weight:500;line-height:1.1}
+
+.icon-btn{width:32px;height:32px;display:grid;place-items:center;border-radius:6px;
+  border:1px solid var(--panel-edge);background:none;color:var(--muted);cursor:pointer;flex-shrink:0}
+.icon-btn:hover{color:var(--ink);background:var(--brand-wash)}
+.icon-btn[aria-pressed="true"]{color:var(--brand-bright);border-color:var(--brand)}
+.icon-btn:focus-visible{outline:2px solid var(--brand-bright);outline-offset:2px}
+.icon-btn svg{width:15px;height:15px}
+
+/* Riel de enlace */
+.rail{padding:14px;display:flex;flex-direction:column;overflow-y:auto}
+.rail>.eyebrow{margin-bottom:12px}
+.node{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start}
+.node-ring{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--brand);
+  display:grid;place-items:center;background:var(--panel-solid)}
+.node-ring svg{width:12px;height:12px;color:var(--brand-bright)}
+.node-title{font-family:var(--font-display);font-weight:600;font-size:14px;letter-spacing:.03em;line-height:1.25}
+.node-meta{font-size:11.5px;color:var(--muted);line-height:1.35}
+.seg{display:grid;grid-template-columns:26px 1fr;gap:10px}
+.seg-line{display:flex;justify-content:center}
+.seg-line i{display:block;width:1.5px;height:100%;min-height:46px;
+  background:linear-gradient(var(--brand),color-mix(in srgb,var(--brand) 28%,transparent))}
+.seg-body{padding:7px 0 9px}
+.seg-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:5px}
+.seg-name{font-family:var(--font-display);font-size:11px;font-weight:600;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--ink-soft)}
+.seg-val{font-family:var(--font-data);font-size:12px;font-variant-numeric:tabular-nums}
+.bar{height:4px;border-radius:2px;background:color-mix(in srgb,var(--muted) 24%,transparent);overflow:hidden}
+.bar>span{display:block;height:100%;border-radius:2px;transition:width .6s ease}
+.seg-note{font-size:11px;color:var(--muted-dim);margin-top:5px;line-height:1.35}
+.rail-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--panel-edge);
+  font-size:11.5px;color:var(--muted);line-height:1.5}
+.rail-foot b{color:var(--ink-soft);font-weight:600}
+
+/* Centro */
+.stage{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+.vista-pane{flex:1;min-height:0;display:none;flex-direction:column;justify-content:space-between;gap:12px}
+.vista-pane.on{display:flex}
+
+/* — vista mapa — */
+#v-mapa{pointer-events:none}
+#v-mapa>*{pointer-events:auto}
+.stage-top{display:flex;gap:10px;align-items:flex-start}
+.mission-card{padding:11px 14px;min-width:0}
+.mission-line{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.mission-name{font-family:var(--font-display);font-weight:600;font-size:15px;letter-spacing:.03em}
+.mission-sep{color:var(--muted-dim)}
+.mission-meta{font-size:12px;color:var(--muted)}
+.wp-track{display:flex;align-items:center;gap:7px;margin-top:8px}
+.wp-bar{flex:1;height:3px;border-radius:2px;min-width:90px;
+  background:color-mix(in srgb,var(--muted) 26%,transparent);overflow:hidden}
+.wp-bar>span{display:block;height:100%;background:var(--brand-bright);border-radius:2px;transition:width .5s}
+.wp-count{font-family:var(--font-data);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.instruments{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding:0;overflow:hidden;flex-shrink:0}
+.inst{padding:11px 14px 12px;border-right:1px solid var(--panel-edge);min-width:0}
+.inst:last-child{border-right:none}
+.inst-label{font-family:var(--font-display);font-size:10px;font-weight:600;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inst-val{font-family:var(--font-data);font-variant-numeric:tabular-nums;font-size:24px;
+  font-weight:500;line-height:1.15;margin-top:3px;display:flex;align-items:baseline;gap:3px}
+.inst-unit{font-size:12px;color:var(--muted);font-weight:400}
+.inst-sub{font-size:11px;color:var(--muted);margin-top:1px;font-family:var(--font-data);
+  font-variant-numeric:tabular-nums}
+.inst.is-warn .inst-val{color:var(--warn)}
+.inst.is-crit .inst-val{color:var(--crit)}
+
+/* — cámaras — */
+.cam{position:relative;overflow:hidden;border-radius:12px;border:1px solid var(--panel-edge);
+  background:#0a1524;box-shadow:var(--shadow);cursor:pointer;isolation:isolate}
+.cam.sel{border-color:var(--c);box-shadow:0 0 0 1px var(--c),var(--shadow)}
+.cam-lienzo,.cam-media{position:absolute;inset:0;display:block;
+  width:100%;height:100%;object-fit:cover;background:#0a1524}
+.cam-scan{position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(rgba(255,255,255,.030) 0 1px,transparent 1px 3px)}
+.cam-vig{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.48) 100%)}
+/* Retícula: esquinas en CSS y cruz centrada en SVG a tamaño fijo. Estirar un
+   SVG a todo el marco deformaría el grosor de línea de forma distinta en cada
+   eje, y una retícula torcida se lee como un defecto de la imagen. */
+.cam-ret{position:absolute;inset:10px;pointer-events:none}
+.cam-ret::before,.cam-ret::after{content:"";position:absolute;bottom:16px;
+  width:13px;height:13px;border-style:solid;border-color:rgba(255,255,255,.55)}
+.cam-ret::before{left:0;border-width:0 0 1.5px 1.5px}
+.cam-ret::after{right:0;border-width:0 1.5px 1.5px 0}
+.cam-cruz{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:44px;height:44px;color:rgba(255,255,255,.6);pointer-events:none}
+.cam-cruz svg{width:100%;height:100%;display:block}
+.cam-top,.cam-bot{position:absolute;left:0;right:0;display:flex;align-items:center;gap:7px;
+  padding:7px 9px;pointer-events:none;font-family:var(--font-data);font-size:10.5px;
+  color:#EAF2FF;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.cam-top{top:0;background:linear-gradient(rgba(4,10,20,.62),transparent)}
+.cam-bot{bottom:0;background:linear-gradient(transparent,rgba(4,10,20,.66));
+  justify-content:space-between;font-variant-numeric:tabular-nums}
+.cam-tag{font-weight:500;padding:1px 5px;border-radius:4px;color:#08121f;background:var(--c)}
+.cam-nom{font-family:var(--font-display);font-weight:600;font-size:12px;letter-spacing:.05em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cam-estado{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:9.5px;
+  letter-spacing:.1em;padding:1px 6px;border-radius:99px;border:1px solid rgba(255,255,255,.34)}
+.cam-estado.sim{color:#FFD166;border-color:rgba(255,209,102,.5)}
+.cam-estado.vivo{color:#6EE7A8;border-color:rgba(110,231,168,.5)}
+.cam-estado i{width:5px;height:5px;border-radius:50%;background:currentColor;display:block}
+.cam-bot span{white-space:nowrap}
+.cam-bot .n{color:#fff;font-weight:500}
+.cam-nolink{position:absolute;inset:0;display:grid;place-items:center;
+  background:rgba(6,12,24,.72);color:#FF9E80;font-family:var(--font-display);
+  font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+
+.mosaico{flex:1;min-height:0;overflow-y:auto;display:grid;gap:12px;align-content:start;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.mosaico .cam{aspect-ratio:16/9}
+.mosaico-vacio{grid-column:1/-1;padding:38px;text-align:center;color:var(--muted)}
+
+/* PiP sobre el mapa */
+.pip{position:absolute;right:0;bottom:88px;width:270px;aspect-ratio:16/9;z-index:2}
+.pip[hidden]{display:none}
+.pip-x{position:absolute;top:6px;right:6px;z-index:3;width:22px;height:22px;border-radius:5px;
+  border:1px solid rgba(255,255,255,.3);background:rgba(6,14,26,.6);color:#dbe7f7;
+  cursor:pointer;display:grid;place-items:center;font-size:13px;line-height:1;padding:0}
+
+/* — bitácoras — */
+.panel{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 16px;border-bottom:1px solid var(--panel-edge);flex-shrink:0}
+.panel-body{flex:1;min-height:0;overflow-y:auto;padding:14px 16px 16px}
+
+.subida{display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:stretch}
+.subida-dron{display:flex;flex-direction:column;gap:6px;justify-content:center}
+select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius:8px;
+  border:1px solid var(--panel-edge);background:var(--panel-solid);color:var(--ink)}
+.drop{border:1.5px dashed color-mix(in srgb,var(--brand) 42%,transparent);border-radius:12px;
+  padding:16px;text-align:center;color:var(--muted);background:var(--brand-wash);transition:.15s}
+.drop.hover{border-color:var(--brand-bright);background:color-mix(in srgb,var(--brand) 18%,transparent);
+  color:var(--ink)}
+.drop b{color:var(--ink-soft)}
+.drop-nota{font-family:var(--font-data);font-size:10.5px;color:var(--muted-dim);margin-top:5px}
+.enlace{background:none;border:none;padding:0;font:inherit;color:var(--brand-bright);
+  cursor:pointer;text-decoration:underline}
+
+.cola{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.cola:empty{display:none}
+.cola-fila{display:grid;grid-template-columns:1fr 74px;gap:9px;align-items:center;
+  font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--panel-edge)}
+.cola-nom{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-data);font-size:11px}
+.cola-pct{font-family:var(--font-data);font-size:11px;text-align:right;color:var(--muted)}
+.cola-fila.err{border-color:var(--crit)} .cola-fila.err .cola-pct{color:var(--crit)}
+.cola-fila.ok{border-color:var(--ok)} .cola-fila.ok .cola-pct{color:var(--ok)}
+
+.tabla-wrap{margin-top:16px;overflow-x:auto}
+.tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:520px}
+.tabla th{text-align:left;font-family:var(--font-display);font-size:10px;font-weight:600;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
+  padding:0 10px 8px;border-bottom:1px solid var(--panel-edge);white-space:nowrap}
+.tabla td{padding:8px 10px;border-bottom:1px solid color-mix(in srgb,var(--panel-edge) 55%,transparent);
+  vertical-align:middle}
+.tabla tr:hover td{background:var(--brand-wash)}
+.tabla .t-arch{font-family:var(--font-data);font-size:11.5px;word-break:break-all}
+.tabla .t-num{font-family:var(--font-data);font-variant-numeric:tabular-nums;
+  white-space:nowrap;color:var(--muted)}
+.tabla .t-acc{text-align:right;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.chip-tag{font-family:var(--font-data);font-size:10px;padding:1px 5px;border-radius:4px;
+  color:#08121f;background:var(--c)}
+.mini{border:1px solid var(--panel-edge);background:none;border-radius:6px;cursor:pointer;
+  color:var(--muted);font-family:var(--font-body);font-size:11.5px;padding:3px 9px;margin-left:5px}
+.mini:hover{color:var(--ink);background:var(--brand-wash)}
+.mini.peligro:hover{color:var(--crit);border-color:var(--crit)}
+.vacio{padding:26px;text-align:center;color:var(--muted-dim);font-size:12.5px}
+
+/* Derecha */
+.side{display:flex;flex-direction:column;gap:12px;min-height:0}
+.events{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.events-head{display:flex;align-items:center;justify-content:space-between;
+  padding:11px 14px 9px;border-bottom:1px solid var(--panel-edge);flex-shrink:0}
+.log{overflow-y:auto;padding:4px 0;flex:1;scrollbar-width:thin}
+.ev{display:grid;grid-template-columns:3px auto auto 1fr;gap:8px;padding:6px 14px 6px 0;align-items:baseline}
+.ev+.ev{border-top:1px solid color-mix(in srgb,var(--panel-edge) 55%,transparent)}
+.ev-stripe{border-radius:0 2px 2px 0;align-self:stretch;background:var(--sev)}
+.ev-time{font-family:var(--font-data);font-size:10.5px;color:var(--muted-dim);font-variant-numeric:tabular-nums}
+.ev-tag{font-family:var(--font-data);font-size:9.5px;padding:0 4px;border-radius:3px;
+  color:#08121f;background:var(--c)}
+.ev-text{font-size:12.5px;color:var(--ink-soft);line-height:1.35;min-width:0;overflow-wrap:anywhere}
+.sev-info{--sev:var(--brand-bright)} .sev-ok{--sev:var(--ok)} .sev-warn{--sev:var(--warn)}
+.sev-alert{--sev:var(--alert)} .sev-crit{--sev:var(--crit)}
+
+.capa{padding:11px 14px}
+.capa[hidden]{display:none}
+.capa-row{display:flex;gap:6px;margin-top:8px}
+.capa-btn{flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--panel-edge);
+  background:none;color:var(--muted);font-family:var(--font-body);font-size:12px;cursor:pointer}
+.capa-btn[aria-pressed="true"]{background:var(--brand-wash);border-color:var(--brand);color:var(--ink);font-weight:600}
+.capa-btn:focus-visible{outline:2px solid var(--brand-bright);outline-offset:2px}
+
+/* Aviso de conexión */
+.aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1200;
+  display:flex;align-items:center;gap:10px;padding:9px 16px;border-radius:999px;
+  font-size:13px;box-shadow:var(--shadow);
+  background:var(--panel-solid);border:1px solid var(--panel-edge)}
+.aviso[hidden]{display:none!important}
+.aviso .dot{width:8px;height:8px}
+
+/* Marcador de aeronave */
+.craft-mark{will-change:transform}
+.cm{position:relative;width:44px;height:44px}
+.cm svg{display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,.55))}
+.cm-tag{position:absolute;left:50%;top:41px;transform:translateX(-50%);
+  font-family:var(--font-data);font-size:10px;font-weight:500;line-height:1.5;
+  padding:0 5px;border-radius:4px;color:#08121f;background:var(--c);
+  box-shadow:0 1px 3px rgba(0,0,0,.4);white-space:nowrap}
+.craft-mark.dim{opacity:.6}
+
+.leaflet-container{background:var(--ground);font-family:var(--font-body)}
+.leaflet-control-attribution{font-size:10px!important}
+
+@media (max-width:1320px){ .vista-btn span{display:none} .vista-btn{padding:6px 9px} }
+@media (max-width:1180px){
+  .console{grid-template-columns:214px 1fr;grid-template-rows:56px 1fr 240px}
+  .side{grid-column:1/-1}
+  .pip{width:220px;bottom:84px}
+}
+@media (max-width:860px){
+  body{overflow:auto}
+  .console{grid-template-columns:1fr;grid-template-rows:auto 70vh auto auto;height:auto}
+  .rail{order:3}.stage{order:2}.side{order:4;min-height:280px}
+  .instruments{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .inst:nth-child(3){border-right:none}
+  .inst:nth-child(-n+3){border-bottom:1px solid var(--panel-edge)}
+  .subida{grid-template-columns:1fr}
+  .pip{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<div class="console">
+  <div id="map"></div>
+
+  <header class="topbar glass">
+    <div class="brand">
+      <img src="assets/otech.png" alt="OTECH">
+      <div><div class="brand-name">TORRE</div><div class="brand-sub">OTECH</div></div>
+    </div>
+    <div class="rule"></div>
+    <nav class="fleet" id="fleet" aria-label="Flota"></nav>
+    <div class="spacer"></div>
+
+    <div class="vistas" role="group" aria-label="Vista">
+      <button class="vista-btn" data-vista="mapa" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 3 3 5.5v15L9 18l6 3 6-2.5v-15L15 6Z"/><path d="M9 3v15M15 6v15"/></svg>
+        <span>Mapa</span>
+      </button>
+      <button class="vista-btn" data-vista="camaras" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="6" width="13" height="12" rx="2"/><path d="m15 11 7-4v10l-7-4Z"/></svg>
+        <span>Cámaras</span><span class="pill" id="pill-cam">0</span>
+      </button>
+      <button class="vista-btn" data-vista="bitacoras" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 4a2 2 0 0 1 2-2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
+          <path d="M14 2v6h6M9 14h6M9 18h6"/></svg>
+        <span>Bitácoras</span><span class="pill" id="pill-log">0</span>
+      </button>
+    </div>
+
+    <div class="mode-badge" title="La nube observa. El mando sigue en el enlace RF local.">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+      <span class="eyebrow">Supervisión · sin mando</span>
+    </div>
+    <div class="rule"></div>
+    <div class="utc"><div class="eyebrow">UTC</div><div class="clock num" id="clock">--:--:--</div></div>
+    <button class="icon-btn" id="follow" aria-pressed="true" aria-label="Seguir a la aeronave" title="Seguir a la aeronave">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="theme" aria-label="Modo día o noche">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>
+      </svg>
+    </button>
+  </header>
+
+  <aside class="rail glass">
+    <div class="eyebrow">Cadena de enlace</div>
+
+    <div class="node">
+      <div><div class="node-ring">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3 13.6 9.4 22 11l-8.4 1.6L12 21l-1.6-8.4L2 11l8.4-1.6Z"/></svg>
+      </div></div>
+      <div><div class="node-title">Aeronave</div>
+        <div class="node-meta" id="n-air">Sin telemetría</div></div>
+    </div>
+
+    <div class="seg">
+      <div class="seg-line"><i></i></div>
+      <div class="seg-body">
+        <div class="seg-head"><span class="seg-name">RF · mando</span><span class="seg-val" id="rssi-val">—</span></div>
+        <div class="bar"><span id="rssi-bar" style="width:0%"></span></div>
+        <div class="seg-note" id="rssi-note">Enlace de mando y control</div>
+      </div>
+    </div>
+
+    <div class="node">
+      <div><div class="node-ring">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="6" y="2" width="12" height="20" rx="2"/><path d="M9 18h6"/></svg>
+      </div></div>
+      <div><div class="node-title">Estación OTECH</div>
+        <div class="node-meta">Reenvío MAVLink · UDP 14550</div></div>
+    </div>
+
+    <div class="seg">
+      <div class="seg-line"><i></i></div>
+      <div class="seg-body">
+        <div class="seg-head"><span class="seg-name">Puente local</span><span class="seg-val" id="ws-val">—</span></div>
+        <div class="bar"><span id="ws-bar" style="width:0%"></span></div>
+        <div class="seg-note" id="ws-note">Solo telemetría</div>
+      </div>
+    </div>
+
+    <div class="node">
+      <div><div class="node-ring">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+      </div></div>
+      <div><div class="node-title">Torre OTECH</div>
+        <div class="node-meta" id="n-torre">Esta máquina</div></div>
+    </div>
+
+    <div class="rail-foot">
+      El mando en tiempo real nunca sale del enlace RF. Esta consola <b>observa</b>;
+      armado, modo de vuelo y retorno se ejecutan desde la radio, conforme a la
+      hipótesis <b>S‑1</b> de OTECH‑GCS‑SW‑001.
+    </div>
+  </aside>
+
+  <section class="stage">
+
+    <!-- ── Vista: mapa ─────────────────────────────────────────────── -->
+    <div class="vista-pane on" id="v-mapa">
+      <div class="stage-top">
+        <div class="mission-card glass">
+          <div class="mission-line">
+            <span class="mission-name" id="m-name">Sin aeronave</span>
+            <span class="mission-sep">·</span>
+            <span class="mission-meta" id="m-mode">—</span>
+          </div>
+          <div class="wp-track">
+            <span class="eyebrow">WP</span>
+            <span class="wp-bar"><span id="wp-fill" style="width:0%"></span></span>
+            <span class="wp-count" id="wp-count">-- / --</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="instruments glass">
+        <div class="inst"><div class="inst-label">Altitud AGL</div>
+          <div class="inst-val"><span id="i-alt">—</span><span class="inst-unit">m</span></div>
+          <div class="inst-sub" id="i-amsl">— m AMSL</div></div>
+        <div class="inst"><div class="inst-label">Vel. suelo</div>
+          <div class="inst-val"><span id="i-gs">—</span><span class="inst-unit">m/s</span></div>
+          <div class="inst-sub" id="i-as">TAS —</div></div>
+        <div class="inst"><div class="inst-label">Rumbo</div>
+          <div class="inst-val"><span id="i-hdg">—</span><span class="inst-unit">°</span></div>
+          <div class="inst-sub" id="i-vs">Vario —</div></div>
+        <div class="inst" id="inst-batt"><div class="inst-label">Batería</div>
+          <div class="inst-val"><span id="i-batt">—</span><span class="inst-unit">%</span></div>
+          <div class="inst-sub" id="i-batt2">— V</div></div>
+        <div class="inst"><div class="inst-label">GNSS</div>
+          <div class="inst-val"><span id="i-sats">—</span><span class="inst-unit">sat</span></div>
+          <div class="inst-sub" id="i-fix">—</div></div>
+        <div class="inst"><div class="inst-label">Tiempo de enlace</div>
+          <div class="inst-val num" id="i-ete">00:00:00</div>
+          <div class="inst-sub" id="i-pos">—</div></div>
+      </div>
+    </div>
+
+    <!-- ── Vista: mosaico de cámaras ───────────────────────────────── -->
+    <div class="vista-pane" id="v-camaras">
+      <div class="mosaico" id="mosaico"></div>
+    </div>
+
+    <!-- ── Vista: bitácoras ────────────────────────────────────────── -->
+    <div class="vista-pane" id="v-bitacoras">
+      <div class="panel glass">
+        <header class="panel-head">
+          <span class="eyebrow">Bitácoras de vuelo</span>
+          <span class="eyebrow" id="log-resumen">—</span>
+        </header>
+        <div class="panel-body">
+          <div class="subida">
+            <label class="subida-dron">
+              <span class="eyebrow">Asignar a</span>
+              <select id="log-sysid"></select>
+            </label>
+            <div class="drop" id="drop">
+              <div><b>Arrastra los registros aquí</b> o <button class="enlace" id="examinar">examinar</button></div>
+              <div class="drop-nota">.ulg · .ulog · .tlog · .bin · .px4log · .csv · .log · .txt — hasta 512 MB</div>
+              <input type="file" id="file" multiple hidden>
+            </div>
+          </div>
+          <div class="cola" id="cola"></div>
+          <div class="tabla-wrap">
+            <table class="tabla">
+              <thead><tr><th>Aeronave</th><th>Archivo</th><th>Tamaño</th><th>Recibido</th><th></th></tr></thead>
+              <tbody id="tabla-logs"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cámara del vehículo seleccionado, sobre el mapa -->
+    <div class="pip" id="pip"></div>
+  </section>
+
+  <aside class="side">
+    <div class="capa glass" id="capa-panel">
+      <div class="eyebrow">Cartografía</div>
+      <div class="capa-row">
+        <button class="capa-btn" data-capa="calle" aria-pressed="true">Calles</button>
+        <button class="capa-btn" data-capa="relieve" aria-pressed="false">Relieve</button>
+        <button class="capa-btn" data-capa="propio" aria-pressed="false"
+                title="Tus ortomosaicos en web/tiles/">Propio</button>
+      </div>
+    </div>
+
+    <div class="events glass">
+      <div class="events-head">
+        <span class="eyebrow">Eventos MAVLink</span>
+        <span class="eyebrow" id="ev-count">0</span>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+  </aside>
+</div>
+
+<div class="aviso" id="aviso"><span class="dot off"></span><span id="aviso-txt">Conectando con el puente…</span></div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  function dosDig(n) { return String(n).padStart(2, "0"); }
+
+  /* ── Identidad visual por aeronave ──────────────────────────────────
+     Un color y una etiqueta de dos dígitos derivados del sysid, iguales en
+     el mapa, en las pastillas de flota, en el mosaico y en la bitácora. Es
+     lo que permite seguir cuatro aeronaves sin leer un solo nombre.       */
+  var PALETA = ["#4FC3E8","#F5A524","#7BD88F","#C77DFF","#FF7A45","#5AA9FF","#FF5D8F","#39D3C3"];
+  function colorDe(sysid) { return PALETA[(((sysid | 0) - 1) % PALETA.length + PALETA.length) % PALETA.length]; }
+  function tagDe(sysid) { return dosDig(sysid | 0); }
+
+  /* ── Tema ───────────────────────────────────────────────────────────── */
+  function esOscuro() {
+    var s = document.documentElement.getAttribute("data-theme");
+    return s ? s === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  $("theme").addEventListener("click", function () {
+    document.documentElement.setAttribute("data-theme", esOscuro() ? "light" : "dark");
+    aplicarCapa();
+  });
+
+  /* ── Reloj ──────────────────────────────────────────────────────────── */
+  setInterval(function () {
+    var d = new Date();
+    $("clock").textContent = dosDig(d.getUTCHours()) + ":" + dosDig(d.getUTCMinutes()) + ":" + dosDig(d.getUTCSeconds());
+  }, 1000);
+
+  /* ── Mapa ───────────────────────────────────────────────────────────── */
+  var map = L.map("map", { zoomControl: false, attributionControl: true })
+             .setView([20.7431, -100.4512], 14);
+  L.control.zoom({ position: "bottomright" }).addTo(map);
+
+  /* Solo fuentes de uso libre, también comercial:
+       calle  — OpenStreetMap, datos ODbL, atribución obligatoria
+       relieve— OpenTopoMap, CC-BY-SA sobre datos OSM + SRTM
+       propio — tus ortomosaicos en web/tiles/{z}/{x}/{y}.png
+     Ambos servicios públicos corren sobre infraestructura donada y piden uso
+     moderado: valen para un puesto de operación, no para repartir la consola
+     entre muchos clientes. Para eso está la capa propia. */
+  var CAPAS = {
+    calle: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }),
+    relieve: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+      maxZoom: 17, subdomains: "abc",
+      attribution: 'Mapa © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA), datos © OpenStreetMap'
+    }),
+    propio: L.tileLayer("tiles/{z}/{x}/{y}.png", {
+      maxZoom: 22, maxNativeZoom: 21,
+      errorTileUrl: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+      attribution: "Ortomosaico propio · OTECH"
+    })
+  };
+  var capaActual = "calle";
+  CAPAS.calle.addTo(map);
+
+  var botonesCapa = Array.prototype.slice.call(document.querySelectorAll(".capa-btn"));
+
+  function aplicarCapa() {
+    Object.keys(CAPAS).forEach(function (k) { if (map.hasLayer(CAPAS[k])) map.removeLayer(CAPAS[k]); });
+    CAPAS[capaActual].addTo(map);
+    botonesCapa.forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.capa === capaActual));
+    });
+    /* Los mapas de calles son claros por diseño y deslumbran de noche; se
+       invierten. Un ortomosaico no: alterarle el color falsea lo que se ve. */
+    map.getPane("tilePane").style.filter =
+      (capaActual !== "propio" && esOscuro())
+        ? "invert(1) hue-rotate(190deg) brightness(.85) contrast(.9)" : "";
+  }
+  botonesCapa.forEach(function (b) {
+    b.addEventListener("click", function () { capaActual = b.dataset.capa; aplicarCapa(); });
+  });
+  aplicarCapa();
+
+  var seguir = true;
+  $("follow").addEventListener("click", function () {
+    seguir = !seguir;
+    this.setAttribute("aria-pressed", String(seguir));
+  });
+  map.on("dragstart", function () { seguir = false; $("follow").setAttribute("aria-pressed", "false"); });
+
+  /* Marcador: galón del color de la aeronave, girado al rumbo, con su
+     etiqueta debajo. El seleccionado lleva anillo; los demás se atenúan.  */
+  function iconoAeronave(v, activo) {
+    var c = colorDe(v.sysid), r = v.rumbo || 0;
+    return L.divIcon({
+      className: "craft-mark" + (activo ? "" : " dim"),
+      iconSize: [44, 44], iconAnchor: [22, 22],
+      html: '<div class="cm" style="--c:' + c + '">' +
+              '<svg width="44" height="44" viewBox="0 0 44 44">' +
+                (activo ? '<circle cx="22" cy="22" r="18" fill="none" stroke="' + c + '" stroke-width="1.3" opacity=".55"/>' : "") +
+                '<g transform="rotate(' + r.toFixed(1) + ' 22 22)">' +
+                  '<path d="M22 8 L30 34 L22 29 L14 34 Z" fill="' + c +
+                  '" stroke="#07142b" stroke-width="1.5" stroke-linejoin="round"/></g>' +
+              '</svg>' +
+              '<span class="cm-tag">' + tagDe(v.sysid) + '</span>' +
+            '</div>'
+    });
+  }
+
+  var marcadores = {}, estelas = {};
+
+  function pintarMapa(v, activo) {
+    if (v.lat === null || v.lon === null) return;
+    var pos = [v.lat, v.lon], c = colorDe(v.sysid);
+
+    if (!marcadores[v.sysid]) {
+      marcadores[v.sysid] = L.marker(pos, { icon: iconoAeronave(v, activo), zIndexOffset: 900 })
+        .addTo(map)
+        .on("click", function () { seleccionar(v.sysid); });
+      marcadores[v.sysid]._act = activo;
+      marcadores[v.sysid]._rumbo = -1;
+    } else {
+      marcadores[v.sysid].setLatLng(pos);
+      /* Rehacer el divIcon en cada trama de 5 Hz por cuatro aeronaves cuesta
+         caro y parpadea. Solo se rehace si el rumbo cambió de grado o si
+         cambió la selección. */
+      var r = Math.round(v.rumbo || 0);
+      if (r !== marcadores[v.sysid]._rumbo || activo !== marcadores[v.sysid]._act) {
+        marcadores[v.sysid].setIcon(iconoAeronave(v, activo));
+        marcadores[v.sysid]._rumbo = r;
+        marcadores[v.sysid]._act = activo;
+      }
+    }
+
+    if (v.estela && v.estela.length > 1) {
+      if (!estelas[v.sysid]) {
+        estelas[v.sysid] = L.polyline(v.estela, {
+          color: c, weight: activo ? 3 : 2, opacity: activo ? .85 : .45
+        }).addTo(map);
+      } else {
+        estelas[v.sysid].setLatLngs(v.estela);
+        estelas[v.sysid].setStyle({ weight: activo ? 3 : 2, opacity: activo ? .85 : .45 });
+      }
+    }
+    if (seguir && activo) map.panTo(pos, { animate: true, duration: .4 });
+  }
+
+  function limpiarMapa(vivos) {
+    Object.keys(marcadores).forEach(function (k) {
+      if (vivos.indexOf(Number(k)) === -1) {
+        map.removeLayer(marcadores[k]); delete marcadores[k];
+        if (estelas[k]) { map.removeLayer(estelas[k]); delete estelas[k]; }
+      }
+    });
+  }
+
+  /* ── Cámara representativa ──────────────────────────────────────────
+     Sin flujo real configurado, el mosaico dibuja una vista sintética del
+     terreno que sobrevuela cada aeronave: las parcelas se desplazan con su
+     posición y giran con su rumbo, así que la imagen responde al vuelo en
+     vez de ser un bucle cualquiera. NO es imagen de la cámara: va rotulada
+     SIMULADO en todo momento, y en cuanto camaras.json declare un flujo
+     para ese sysid, la baldosa lo reemplaza por el video de verdad.      */
+
+  function azar(a, b) {                       // ruido estable por celda
+    var h = (a * 73856093) ^ (b * 19349663);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  function tonoParcela(gi, gj, oscuro) {
+    var r = azar(gi, gj), l = oscuro ? 15 + r * 7 : 39 + r * 13;
+    if (r < 0.30) return "hsl(" + (94 + r * 70).toFixed(0) + ",27%," + l.toFixed(0) + "%)";
+    if (r < 0.56) return "hsl(" + (38 + r * 26).toFixed(0) + ",31%," + (l + 4).toFixed(0) + "%)";
+    if (r < 0.79) return "hsl(" + (22 + r * 16).toFixed(0) + ",23%," + (l + 1).toFixed(0) + "%)";
+    return "hsl(214,7%," + (l + 3).toFixed(0) + "%)";
+  }
+
+  var PPM = 2.4;                              // píxeles por metro en la vista
+  var LADO = 55;                              // parcela de 55 m
+
+  function dibujarTerreno(cv, v) {
+    var ctx = cv.getContext("2d");
+    var w = cv.width, h = cv.height, oscuro = esOscuro();
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = oscuro ? "#0a1424" : "#1d3348";
+    ctx.fillRect(0, 0, w, h);
+    if (!v || v.lat === null || v.lon === null) return;
+
+    /* Metros locales -> píxeles. Trabajamos con la fase dentro de la celda
+       para no arrastrar coordenadas de siete cifras por la transformación. */
+    var mx = v.lon * 111320 * Math.cos(v.lat * Math.PI / 180) * PPM;
+    var my = v.lat * 111320 * PPM;
+    var C = LADO * PPM;
+    var i0 = Math.floor(mx / C), j0 = Math.floor(my / C);
+    var fx = mx - i0 * C, fy = my - j0 * C;
+
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(-(v.rumbo || 0) * Math.PI / 180);
+
+    var n = Math.ceil((Math.hypot(w, h) / 2 + C) / C);
+    for (var i = -n; i <= n; i++) {
+      for (var j = -n; j <= n; j++) {
+        var gi = i0 + i, gj = j0 + j;
+        var x = i * C - fx, y = -(j * C - fy);
+        ctx.fillStyle = tonoParcela(gi, gj, oscuro);
+        ctx.fillRect(x, y - C, C + 1, C + 1);
+
+        var r = azar(gi, gj);
+        if (r >= 0.79) {                       // manzana: unas cuantas cubiertas
+          ctx.fillStyle = oscuro ? "rgba(190,205,225,.16)" : "rgba(235,240,248,.28)";
+          for (var k = 0; k < 3; k++) {
+            var a = azar(gi * 31 + k, gj * 17 + k), b = azar(gi * 13 + k, gj * 41 + k);
+            ctx.fillRect(x + a * C * 0.62, y - C + b * C * 0.62, C * 0.22, C * 0.18);
+          }
+        }
+      }
+      if ((i0 + i) % 6 === 0) {                // caminos cada 330 m
+        ctx.fillStyle = oscuro ? "rgba(150,165,185,.22)" : "rgba(250,250,250,.42)";
+        ctx.fillRect(i * C - fx, -n * C, C * 0.09, 2 * n * C);
+      }
+    }
+    for (var jj = -n; jj <= n; jj++) {
+      if ((j0 + jj) % 8 === 0) {
+        ctx.fillStyle = oscuro ? "rgba(150,165,185,.22)" : "rgba(250,250,250,.42)";
+        ctx.fillRect(-n * C, -(jj * C - fy), 2 * n * C, C * 0.09);
+      }
+    }
+    ctx.restore();
+
+    /* Bruma atmosférica: cuanto más alto, más lavada la imagen. */
+    var bruma = Math.min(0.30, (v.altRel || 0) / 900);
+    ctx.fillStyle = oscuro ? "rgba(18,38,68," + bruma + ")" : "rgba(190,212,236," + bruma + ")";
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  var CRUZ =
+    '<svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="1.2">' +
+      '<path d="M22 10v7M22 27v7M10 22h7M27 22h7"/><circle cx="22" cy="22" r="3"/>' +
+    '</svg>';
+
+  /* Baldosa de cámara. Devuelve el elemento y una función de refresco. */
+  function crearCamara(sysid) {
+    var art = document.createElement("article");
+    art.className = "cam";
+    art.style.setProperty("--c", colorDe(sysid));
+    art.dataset.sysid = sysid;
+    art.tabIndex = 0;
+
+    var fuente = CAMARAS[String(sysid)];
+    var lienzo = null, medio = null;
+
+    if (fuente && fuente.url && fuente.tipo === "mjpeg") {
+      medio = document.createElement("img");
+      medio.className = "cam-media"; medio.alt = ""; medio.src = fuente.url;
+    } else if (fuente && fuente.url) {
+      medio = document.createElement("video");
+      medio.className = "cam-media";
+      medio.src = fuente.url; medio.muted = true; medio.autoplay = true;
+      medio.loop = true; medio.playsInline = true;
+    } else {
+      lienzo = document.createElement("canvas");
+      lienzo.className = "cam-lienzo";
+    }
+    art.appendChild(medio || lienzo);
+
+    var scan = document.createElement("div"); scan.className = "cam-scan";
+    var vig = document.createElement("div"); vig.className = "cam-vig";
+    var ret = document.createElement("div"); ret.className = "cam-ret";
+    var cruz = document.createElement("div"); cruz.className = "cam-cruz"; cruz.innerHTML = CRUZ;
+    art.appendChild(scan); art.appendChild(vig); art.appendChild(ret); art.appendChild(cruz);
+
+    var top = document.createElement("div"); top.className = "cam-top";
+    var tag = document.createElement("span"); tag.className = "cam-tag"; tag.textContent = tagDe(sysid);
+    var nom = document.createElement("span"); nom.className = "cam-nom";
+    var est = document.createElement("span");
+    est.className = "cam-estado " + (fuente && fuente.url ? "vivo" : "sim");
+    est.innerHTML = "<i></i>";
+    est.appendChild(document.createTextNode(fuente && fuente.url ? "EN VIVO" : "SIMULADO"));
+    est.title = fuente && fuente.url
+      ? "Flujo declarado en camaras.json"
+      : "Vista representativa generada localmente. No es imagen de la cámara.";
+    top.appendChild(tag); top.appendChild(nom); top.appendChild(est);
+
+    var bot = document.createElement("div"); bot.className = "cam-bot";
+    var mAlt = document.createElement("span"), mVel = document.createElement("span"),
+        mBat = document.createElement("span"), mRum = document.createElement("span");
+    bot.appendChild(mAlt); bot.appendChild(mVel); bot.appendChild(mRum); bot.appendChild(mBat);
+
+    var caida = document.createElement("div");
+    caida.className = "cam-nolink"; caida.textContent = "Sin enlace"; caida.hidden = true;
+
+    art.appendChild(top); art.appendChild(bot); art.appendChild(caida);
+    art.addEventListener("click", function () { seleccionar(sysid); });
+
+    function etiqueta(el, rot, val, uni) {
+      el.innerHTML = "";
+      el.appendChild(document.createTextNode(rot + " "));
+      var s = document.createElement("b"); s.className = "n"; s.textContent = val;
+      el.appendChild(s);
+      if (uni) el.appendChild(document.createTextNode(" " + uni));
+    }
+
+    return {
+      el: art,
+      lienzo: lienzo,
+      refrescar: function (v, activo) {
+        art.classList.toggle("sel", activo);
+        nom.textContent = v ? v.nombre : "—";
+        caida.hidden = !!(v && v.enlace);
+        etiqueta(mAlt, "ALT", v ? n(v.altRel, 0) : "—", "m");
+        etiqueta(mVel, "GS", v ? n(v.velSuelo, 1) : "—", "m/s");
+        etiqueta(mRum, "HDG", v && v.rumbo !== null ? dosDig(Math.round(v.rumbo)).padStart(3, "0") : "—", "");
+        etiqueta(mBat, "BAT", v && v.bateriaPct !== null ? String(v.bateriaPct) : "—", "%");
+      }
+    };
+  }
+
+  /* Un solo bucle para todos los lienzos visibles, a ~15 fps: cuatro canvas
+     a 60 fps calentarían el equipo sin que nadie note la diferencia. */
+  var camaras = {}, pipCam = null, ultimoCuadro = 0;
+
+  function bucleCamaras(t) {
+    requestAnimationFrame(bucleCamaras);
+    if (t - ultimoCuadro < 66) return;
+    ultimoCuadro = t;
+
+    var lista = [];
+    if (vista === "camaras") Object.keys(camaras).forEach(function (k) { lista.push([Number(k), camaras[k]]); });
+    if (pipCam && vista === "mapa" && sel !== null) lista.push([sel, pipCam]);
+
+    lista.forEach(function (par) {
+      var c = par[1];
+      if (!c.lienzo) return;
+      var cv = c.lienzo, an = cv.clientWidth, al = cv.clientHeight;
+      if (!an || !al) return;
+      var dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (cv.width !== Math.round(an * dpr) || cv.height !== Math.round(al * dpr)) {
+        cv.width = Math.round(an * dpr); cv.height = Math.round(al * dpr);
+      }
+      dibujarTerreno(cv, porSysid(par[0]));
+    });
+  }
+  requestAnimationFrame(bucleCamaras);
+
+  function reconstruirMosaico() {
+    var cont = $("mosaico");
+    cont.innerHTML = ""; camaras = {};
+    if (!flota.length) {
+      var vacio = document.createElement("div");
+      vacio.className = "mosaico-vacio";
+      vacio.textContent = "Ninguna aeronave en el enlace.";
+      cont.appendChild(vacio);
+      return;
+    }
+    flota.forEach(function (v) {
+      var c = crearCamara(v.sysid);
+      camaras[v.sysid] = c;
+      cont.appendChild(c.el);
+    });
+  }
+
+  function reconstruirPip() {
+    var cont = $("pip");
+    cont.innerHTML = ""; pipCam = null;
+    if (sel === null) { cont.hidden = true; return; }
+    cont.hidden = false;
+    pipCam = crearCamara(sel);
+    pipCam.el.style.width = "100%"; pipCam.el.style.height = "100%";
+    cont.appendChild(pipCam.el);
+    var x = document.createElement("button");
+    x.className = "pip-x"; x.textContent = "×";
+    x.setAttribute("aria-label", "Ocultar la cámara");
+    x.addEventListener("click", function (e) { e.stopPropagation(); cont.hidden = true; });
+    cont.appendChild(x);
+  }
+
+  /* ── Vistas ─────────────────────────────────────────────────────────── */
+  var vista = "mapa";
+  var botonesVista = Array.prototype.slice.call(document.querySelectorAll(".vista-btn"));
+
+  function ponerVista(v) {
+    vista = v;
+    botonesVista.forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.vista === v)); });
+    ["mapa", "camaras", "bitacoras"].forEach(function (k) {
+      $("v-" + k).classList.toggle("on", k === v);
+    });
+    $("capa-panel").hidden = v !== "mapa";
+    $("pip").hidden = v !== "mapa" || sel === null;
+    if (v === "camaras") reconstruirMosaico();
+    if (v === "bitacoras") cargarCatalogo();
+    if (v === "mapa") setTimeout(function () { map.invalidateSize(); }, 30);
+  }
+  botonesVista.forEach(function (b) {
+    b.addEventListener("click", function () { ponerVista(b.dataset.vista); });
+  });
+
+  /* ── Estado ─────────────────────────────────────────────────────────── */
+  var flota = [], sel = null, desde = null, CAMARAS = {};
+
+  function porSysid(id) {
+    for (var i = 0; i < flota.length; i++) if (flota[i].sysid === id) return flota[i];
+    return null;
+  }
+
+  function seleccionar(sysid) {
+    sel = sysid; seguir = true;
+    $("follow").setAttribute("aria-pressed", "true");
+    pintarFlota();
+    reconstruirPip();
+    $("pip").hidden = vista !== "mapa";
+    var v = porSysid(sysid);
+    if (v && v.lat !== null) map.panTo([v.lat, v.lon], { animate: true });
+  }
+
+  function pintarFlota() {
+    var nav = $("fleet");
+    nav.innerHTML = "";
+    flota.forEach(function (v) {
+      var b = document.createElement("button");
+      b.className = "craft" + (v.enlace ? "" : " craft-off");
+      b.style.setProperty("--c", colorDe(v.sysid));
+      b.setAttribute("aria-pressed", String(v.sysid === sel));
+      b.dataset.sysid = v.sysid;
+
+      var tag = document.createElement("span");
+      tag.className = "craft-tag"; tag.textContent = tagDe(v.sysid);
+      var dot = document.createElement("span");
+      dot.className = "dot " + (v.enlace ? "on" : "off");
+      b.appendChild(tag); b.appendChild(dot);
+      b.appendChild(document.createTextNode(v.nombre));
+
+      b.addEventListener("click", function () { seleccionar(v.sysid); });
+      nav.appendChild(b);
+    });
+    $("pill-cam").textContent = flota.length;
+    llenarSelectorLogs();
+  }
+
+  function n(x, d) { return (x === null || x === undefined || isNaN(x)) ? "—" : Number(x).toFixed(d === undefined ? 1 : d); }
+  function miles(x) { return x === null || x === undefined ? "—" : Math.round(x).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+
+  function pintarVehiculo(v) {
+    if (!v) return;
+
+    $("m-name").textContent = v.nombre;
+    $("m-mode").textContent = v.modo + (v.tipo !== "—" ? " · " + v.tipo : "") + (v.armado ? " · ARMADO" : "");
+    $("n-air").textContent = "sysid " + v.sysid + (v.tipo !== "—" ? " · " + v.tipo : "");
+
+    $("i-alt").textContent = n(v.altRel);
+    $("i-amsl").textContent = v.altMsl === null ? "— m AMSL" : miles(v.altMsl) + " m AMSL";
+    $("i-gs").textContent = n(v.velSuelo);
+    $("i-as").textContent = "TAS " + n(v.velAire) + " m/s";
+    $("i-hdg").textContent = v.rumbo === null ? "—" : dosDig(Math.round(v.rumbo)).padStart(3, "0");
+    $("i-vs").textContent = "Vario " + n(v.ascenso) + " m/s";
+    $("i-batt").textContent = v.bateriaPct === null ? "—" : v.bateriaPct;
+    $("i-batt2").textContent = n(v.voltaje) + " V" + (v.consumo !== null ? " · " + miles(v.consumo) + " mAh" : "");
+    $("i-sats").textContent = v.satelites === null ? "—" : v.satelites;
+    $("i-fix").textContent = (v.fix || "—") + (v.hdop !== null ? " · HDOP " + n(v.hdop, 1) : "");
+    $("i-pos").textContent = v.lat === null ? "—" :
+      Math.abs(v.lat).toFixed(4) + (v.lat >= 0 ? " N" : " S") + " · " +
+      Math.abs(v.lon).toFixed(4) + (v.lon >= 0 ? " E" : " W");
+
+    var ib = $("inst-batt");
+    ib.classList.toggle("is-crit", v.bateriaPct !== null && v.bateriaPct < 20);
+    ib.classList.toggle("is-warn", v.bateriaPct !== null && v.bateriaPct >= 20 && v.bateriaPct < 35);
+
+    if (v.wpTotal) {
+      $("wp-count").textContent = dosDig(v.wpActual || 0) + " / " + dosDig(v.wpTotal);
+      $("wp-fill").style.width = Math.min(100, ((v.wpActual || 0) / v.wpTotal) * 100).toFixed(1) + "%";
+      $("wp-fill").style.background = colorDe(v.sysid);
+    } else {
+      $("wp-count").textContent = "-- / --";
+      $("wp-fill").style.width = "0%";
+    }
+
+    if (v.rssi !== null) {
+      var q = Math.max(0, Math.min(100, (v.rssi + 110) * 1.8));
+      var c = v.rssi > -75 ? "ok" : (v.rssi > -90 ? "warn" : "crit");
+      $("rssi-val").textContent = v.rssi + " dBm";
+      $("rssi-val").style.color = "var(--" + c + ")";
+      $("rssi-bar").style.width = q.toFixed(0) + "%";
+      $("rssi-bar").style.background = "var(--" + c + ")";
+      $("rssi-note").textContent = "Mando y control" + (v.perdida !== null ? " · pérdida " + n(v.perdida, 1) + " %" : "");
+    } else {
+      $("rssi-val").textContent = v.enlace ? "sin RADIO_STATUS" : "—";
+      $("rssi-bar").style.width = v.enlace ? "100%" : "0%";
+      $("rssi-bar").style.background = "var(--" + (v.enlace ? "ok" : "muted") + ")";
+    }
+  }
+
+  /* ── Eventos ────────────────────────────────────────────────────────── */
+  var totalEv = 0;
+  function pintarEvento(e, alFinal) {
+    var d = new Date(e.t);
+    var row = document.createElement("div");
+    row.className = "ev sev-" + (e.nivel || "info");
+
+    var st = document.createElement("span"); st.className = "ev-stripe";
+    var ho = document.createElement("span"); ho.className = "ev-time";
+    ho.textContent = dosDig(d.getUTCHours()) + ":" + dosDig(d.getUTCMinutes()) + ":" + dosDig(d.getUTCSeconds());
+    var tg = document.createElement("span"); tg.className = "ev-tag";
+    if (e.sysid !== null && e.sysid !== undefined) {
+      tg.style.setProperty("--c", colorDe(e.sysid));
+      tg.textContent = tagDe(e.sysid);
+    } else { tg.style.visibility = "hidden"; tg.textContent = "--"; }
+    var tx = document.createElement("span"); tx.className = "ev-text";
+    tx.textContent = e.texto;                 // nunca innerHTML: viene del vehículo
+
+    row.appendChild(st); row.appendChild(ho); row.appendChild(tg); row.appendChild(tx);
+
+    var log = $("log");
+    if (alFinal) log.appendChild(row); else log.insertBefore(row, log.firstChild);
+    while (log.children.length > 120) log.removeChild(log.lastChild);
+    totalEv++;
+    $("ev-count").textContent = totalEv;
+  }
+
+  /* ── Bitácoras ──────────────────────────────────────────────────────── */
+
+  function tam(b) {
+    if (b < 1024) return b + " B";
+    if (b < 1048576) return (b / 1024).toFixed(1) + " kB";
+    if (b < 1073741824) return (b / 1048576).toFixed(1) + " MB";
+    return (b / 1073741824).toFixed(2) + " GB";
+  }
+  function fecha(ms) {
+    var d = new Date(ms);
+    return d.getFullYear() + "-" + dosDig(d.getMonth() + 1) + "-" + dosDig(d.getDate()) +
+           " " + dosDig(d.getHours()) + ":" + dosDig(d.getMinutes());
+  }
+
+  function llenarSelectorLogs() {
+    var s = $("log-sysid"), previo = s.value;
+    s.innerHTML = "";
+    var ids = flota.map(function (v) { return v.sysid; });
+    if (!ids.length) ids = [1];
+    ids.forEach(function (id) {
+      var v = porSysid(id);
+      var o = document.createElement("option");
+      o.value = id;
+      o.textContent = tagDe(id) + " · " + (v ? v.nombre : "sysid " + id);
+      s.appendChild(o);
+    });
+    if (previo && ids.indexOf(Number(previo)) !== -1) s.value = previo;
+    else if (sel !== null && ids.indexOf(sel) !== -1) s.value = sel;
+  }
+
+  function cargarCatalogo() {
+    fetch("api/logs").then(function (r) { return r.json(); }).then(function (d) {
+      pintarCatalogo(d.logs || []);
+    }).catch(function () { pintarCatalogo(null); });
+  }
+
+  function pintarCatalogo(logs) {
+    var tb = $("tabla-logs");
+    tb.innerHTML = "";
+    if (logs === null) {
+      $("log-resumen").textContent = "sin respuesta del puente";
+      return;
+    }
+    $("pill-log").textContent = logs.length;
+    var total = logs.reduce(function (a, l) { return a + l.bytes; }, 0);
+    $("log-resumen").textContent = logs.length
+      ? logs.length + " archivo" + (logs.length === 1 ? "" : "s") + " · " + tam(total)
+      : "archivero vacío";
+
+    if (!logs.length) {
+      var tr = document.createElement("tr");
+      var td = document.createElement("td");
+      td.colSpan = 5; td.className = "vacio";
+      td.textContent = "Todavía no has cargado ninguna bitácora.";
+      tr.appendChild(td); tb.appendChild(tr);
+      return;
+    }
+
+    logs.forEach(function (l) {
+      var tr = document.createElement("tr");
+
+      var tdA = document.createElement("td");
+      var chip = document.createElement("span");
+      chip.className = "chip"; chip.style.setProperty("--c", colorDe(l.sysid));
+      var ct = document.createElement("span");
+      ct.className = "chip-tag"; ct.textContent = tagDe(l.sysid);
+      var v = porSysid(l.sysid);
+      chip.appendChild(ct);
+      chip.appendChild(document.createTextNode(v ? v.nombre : "sysid " + l.sysid));
+      tdA.appendChild(chip);
+
+      var tdF = document.createElement("td");
+      tdF.className = "t-arch"; tdF.textContent = l.archivo;
+
+      var tdT = document.createElement("td"); tdT.className = "t-num"; tdT.textContent = tam(l.bytes);
+      var tdD = document.createElement("td"); tdD.className = "t-num"; tdD.textContent = fecha(l.subido);
+
+      var tdC = document.createElement("td"); tdC.className = "t-acc";
+      var baj = document.createElement("a");
+      baj.className = "mini"; baj.textContent = "Descargar";
+      baj.href = "api/logs/" + l.sysid + "/" + encodeURIComponent(l.archivo);
+      baj.setAttribute("download", "");
+      var bor = document.createElement("button");
+      bor.className = "mini peligro"; bor.textContent = "Borrar";
+      bor.addEventListener("click", function () {
+        if (!confirm("¿Borrar " + l.archivo + "? No hay papelera.")) return;
+        fetch("api/logs/" + l.sysid + "/" + encodeURIComponent(l.archivo), { method: "DELETE" })
+          .then(cargarCatalogo);
+      });
+      tdC.appendChild(baj); tdC.appendChild(bor);
+
+      tr.appendChild(tdA); tr.appendChild(tdF); tr.appendChild(tdT); tr.appendChild(tdD); tr.appendChild(tdC);
+      tb.appendChild(tr);
+    });
+  }
+
+  /* Subida con XHR y no con fetch: fetch no informa del avance, y un .ulg de
+     300 MB sin barra de progreso parece un cuelgue. */
+  function subir(archivo, sysid) {
+    var fila = document.createElement("div");
+    fila.className = "cola-fila";
+    var nom = document.createElement("div"); nom.className = "cola-nom";
+    nom.textContent = tagDe(sysid) + " · " + archivo.name;
+    var pct = document.createElement("div"); pct.className = "cola-pct"; pct.textContent = "0 %";
+    fila.appendChild(nom); fila.appendChild(pct);
+    $("cola").appendChild(fila);
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "api/logs/" + sysid + "?archivo=" + encodeURIComponent(archivo.name));
+    xhr.upload.onprogress = function (e) {
+      if (e.lengthComputable) pct.textContent = Math.round(e.loaded / e.total * 100) + " %";
+    };
+    xhr.onload = function () {
+      var ok = xhr.status === 200;
+      fila.className = "cola-fila " + (ok ? "ok" : "err");
+      if (ok) { pct.textContent = "listo"; setTimeout(function () { fila.remove(); }, 2500); }
+      else {
+        var msg = "error";
+        try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+        pct.textContent = xhr.status;
+        nom.textContent = archivo.name + " — " + msg;
+      }
+      cargarCatalogo();
+    };
+    xhr.onerror = function () {
+      fila.className = "cola-fila err"; pct.textContent = "sin red";
+    };
+    xhr.send(archivo);
+  }
+
+  function encolar(lista) {
+    var sysid = Number($("log-sysid").value || 1);
+    Array.prototype.slice.call(lista).forEach(function (f) { subir(f, sysid); });
+  }
+
+  $("examinar").addEventListener("click", function () { $("file").click(); });
+  $("file").addEventListener("change", function () { encolar(this.files); this.value = ""; });
+
+  var drop = $("drop");
+  ["dragenter", "dragover"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("hover"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("hover"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) encolar(e.dataTransfer.files);
+  });
+  /* El navegador abriría el archivo soltado fuera de la zona; se le impide. */
+  window.addEventListener("dragover", function (e) { e.preventDefault(); });
+  window.addEventListener("drop", function (e) { e.preventDefault(); });
+
+  /* ── Configuración de cámaras ───────────────────────────────────────── */
+  fetch("api/camaras")
+    .then(function (r) { return r.json(); })
+    .then(function (d) { CAMARAS = d.camaras || {}; })
+    .catch(function () { CAMARAS = {}; });
+
+  /* ── WebSocket ──────────────────────────────────────────────────────── */
+  var ws, reintento = 800;
+
+  function conectar() {
+    ws = new WebSocket("ws://" + location.hostname + ":8081/");
+
+    ws.onopen = function () {
+      reintento = 800;
+      $("aviso-txt").textContent = "Puente conectado · esperando telemetría";
+      $("aviso").querySelector(".dot").className = "dot on";
+    };
+
+    ws.onmessage = function (ev) {
+      var m = JSON.parse(ev.data);
+
+      if (m.tipo === "inicial") {
+        flota = m.flota;
+        if (flota.length && sel === null) sel = flota[0].sysid;
+        pintarFlota(); reconstruirPip();
+        m.eventos.forEach(function (e) { pintarEvento(e, true); });
+        encuadrar();
+      }
+
+      if (m.tipo === "evento") pintarEvento(m.evento, false);
+
+      if (m.tipo === "telemetria") {
+        var firma = flota.map(function (v) { return v.sysid + (v.enlace ? "1" : "0"); }).join(",");
+        flota = m.flota;
+        if (sel === null && flota.length) sel = flota[0].sysid;
+
+        var nueva = flota.map(function (v) { return v.sysid + (v.enlace ? "1" : "0"); }).join(",");
+        if (nueva !== firma) {
+          pintarFlota();
+          if (vista === "camaras") reconstruirMosaico();
+          if (!porSysid(sel) && flota.length) { sel = flota[0].sysid; reconstruirPip(); }
+        }
+
+        var vivos = flota.map(function (v) { return v.sysid; });
+        limpiarMapa(vivos);
+        flota.forEach(function (v) { pintarMapa(v, v.sysid === sel); });
+
+        var v = porSysid(sel);
+        pintarVehiculo(v);
+        if (vista === "camaras") {
+          flota.forEach(function (x) { if (camaras[x.sysid]) camaras[x.sysid].refrescar(x, x.sysid === sel); });
+        } else if (pipCam) {
+          pipCam.refrescar(v, true);
+        }
+
+        if (v && v.enlace) {
+          if (!desde) desde = Date.now();
+          $("aviso").hidden = true;
+        } else {
+          desde = null;
+          $("aviso").hidden = false;
+          $("aviso-txt").textContent = flota.length
+            ? "Sin telemetría — revisa el reenvío MAVLink en la estación"
+            : "Puente conectado · ninguna aeronave en el enlace";
+        }
+        $("ws-val").textContent = "activo";
+        $("ws-val").style.color = "var(--ok)";
+        $("ws-bar").style.width = "100%";
+        $("ws-bar").style.background = "var(--ok)";
+      }
+    };
+
+    ws.onclose = function () {
+      $("aviso").hidden = false;
+      $("aviso").querySelector(".dot").className = "dot off";
+      $("aviso-txt").textContent = "Puente desconectado · reintentando";
+      $("ws-val").textContent = "caído";
+      $("ws-val").style.color = "var(--crit)";
+      $("ws-bar").style.width = "0%";
+      setTimeout(conectar, reintento);          // espera creciente, hasta 8 s
+      reintento = Math.min(8000, reintento * 1.7);
+    };
+
+    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  }
+
+  /* Al conectar por primera vez, encuadra toda la flota en vez de una sola:
+     con cuatro aeronaves repartidas, centrarse en una esconde a las demás. */
+  var encuadrado = false;
+  function encuadrar() {
+    if (encuadrado) return;
+    var pts = flota.filter(function (v) { return v.lat !== null; })
+                   .map(function (v) { return [v.lat, v.lon]; });
+    if (!pts.length) return;
+    encuadrado = true;
+    if (pts.length === 1) map.setView(pts[0], 16);
+    else map.fitBounds(L.latLngBounds(pts).pad(0.25));
+  }
+
+  conectar();
+  cargarCatalogo();
+
+  setInterval(function () {
+    if (!desde) { $("i-ete").textContent = "00:00:00"; return; }
+    var s = Math.floor((Date.now() - desde) / 1000);
+    $("i-ete").textContent = dosDig(Math.floor(s / 3600)) + ":" + dosDig(Math.floor(s / 60) % 60) + ":" + dosDig(s % 60);
+  }, 1000);
+
+  window.addEventListener("resize", function () { map.invalidateSize(); });
+})();
+</script>
+</body>
+</html>
