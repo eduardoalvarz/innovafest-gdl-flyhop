@@ -137,6 +137,8 @@ ollama pull llama3.2    # 1.9 GB
 | `OTECH_LLM_MODEL` | `llama3.2:latest` | Modelo por omisión |
 | `OTECH_LLM_TEMP` | `0.25` | Temperatura |
 | `OTECH_LLM_MAX` | `700` | Tope de tokens por respuesta |
+| `OTECH_LLM_CTX` | `8192` | Ventana de contexto que se le pide al modelo |
+| `OTECH_LLM_FICHAS` | `4200` | Presupuesto de caracteres para las fichas detalladas |
 
 El selector del pie del chat permite cambiar de modelo sin reiniciar.
 
@@ -167,6 +169,19 @@ Así que no lo es:
 Con eso, la prosa del modelo pasó a coincidir con la alarma. Pero la garantía
 no es que coincida: es que **la tarjeta sale igual aunque el modelo se
 equivoque**.
+
+### Flotas grandes
+
+Ollama carga llama3.2 con **4096 tokens de contexto** por omisión, y cada ficha
+de aeronave cuesta unos 150. Alrededor de once aeronaves el informe lo
+desbordaría, y Ollama recorta en silencio: nadie se entera de que el modelo
+dejó de ver media flota.
+
+Dos medidas contra eso. El puente pide **8192 tokens** explícitamente, y si aun
+así el informe crece, las aeronaves **sin hallazgos** pasan a una línea
+resumida mientras las que tienen aviso o crítico conservan su ficha completa.
+El informe dice cuántas resumió, para que el modelo sepa que no lo está viendo
+todo. Con 14 aeronaves el informe ocupa ~1430 tokens y ninguna desaparece.
 
 ### El asistente no manda
 

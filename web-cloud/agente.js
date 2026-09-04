@@ -24,7 +24,14 @@ const CFG = {
   modelo:   process.env.OTECH_LLM_MODEL || "llama3.2:latest",
   temp:     Number(process.env.OTECH_LLM_TEMP || 0.25),
   maxTok:   Number(process.env.OTECH_LLM_MAX  || 700),
-  turnos:   6            // pares pregunta/respuesta que se conservan
+  ctx:      Number(process.env.OTECH_LLM_CTX  || 8192),
+  turnos:   6,           // pares pregunta/respuesta que se conservan
+  /* Presupuesto de caracteres para las fichas detalladas. Por encima de esto
+     las aeronaves sanas pasan a una línea resumida. El modelo carga por
+     omisión con 4096 tokens de contexto, y a ~150 tokens por ficha una flota
+     de once aeronaves lo desborda; Ollama recortaría entonces en silencio, y
+     un informe truncado sin avisar es peor que uno resumido con aviso. */
+  fichasMax: Number(process.env.OTECH_LLM_FICHAS || 4200)
 };
 
 /* ── Umbrales ─────────────────────────────────────────────────────────────
@@ -195,7 +202,32 @@ function informe(estado) {
   }
   P.push("");
 
-  for (const v of flota) { P.push(fichaAeronave(v)); P.push(""); }
+  /* Las aeronaves con hallazgos van primero y siempre con ficha completa.
+     Si el presupuesto se agota, las sanas se resumen en una línea y se dice
+     cuántas: el modelo debe saber que no lo está viendo todo. */
+  const conHallazgo = flota.filter((v) => revisar(v).length);
+  const sanas       = flota.filter((v) => !revisar(v).length);
+  let gastado = 0;
+  const resumidas = [];
+
+  for (const v of conHallazgo.concat(sanas)) {
+    const f = fichaAeronave(v);
+    if (gastado + f.length > CFG.fichasMax && !revisar(v).length) { resumidas.push(v); continue; }
+    P.push(f); P.push("");
+    gastado += f.length;
+  }
+
+  if (resumidas.length) {
+    P.push("== " + resumidas.length + " AERONAVE(S) SIN HALLAZGOS, EN RESUMEN ==");
+    P.push("(ficha completa omitida por espacio; ninguna tiene aviso ni crítico)");
+    for (const v of resumidas) {
+      P.push(" [" + tag(v.sysid) + "] " + v.nombre + " · " + v.modo +
+             " · " + (v.enlace ? "enlace activo" : "sin enlace") +
+             " · " + n(v.altRel, 0) + " m · " + n(v.velSuelo) + " m/s · " +
+             (v.bateriaPct === null ? "— " : v.bateriaPct + " ") + "%");
+    }
+    P.push("");
+  }
 
   const ult = (eventos || []).slice(-14);
   P.push("== ÚLTIMOS EVENTOS MAVLINK (" + ult.length + " de " + (eventos || []).length + ") ==");
@@ -288,7 +320,9 @@ async function *preguntar(mensaje, historial, estado, señal, modelo) {
       messages: mensajes,
       stream: true,
       think: false,                 // los modelos de razonamiento gastarían el presupuesto pensando
-      options: { temperature: CFG.temp, num_predict: CFG.maxTok }
+      /* num_ctx explícito: el modelo carga por omisión con 4096 y una flota
+         grande desbordaría el informe sin que nadie se entere. */
+      options: { temperature: CFG.temp, num_predict: CFG.maxTok, num_ctx: CFG.ctx }
     }),
     signal: señal
   });

@@ -100,6 +100,35 @@ comprueba("no se repite el tipo cuando el nombre ya lo lleva",
 comprueba("el informe no filtra la estela completa al modelo",
   !/estela/i.test(inf), "900 puntos de estela llenarían el contexto sin aportar nada");
 
+/* ── Flota grande ───────────────────────────────────────────────────────── */
+titulo("Degradación con una flota que no cabe en el contexto");
+
+const grande = [];
+for (let i = 1; i <= 14; i++) grande.push(nave({ sysid: i, nombre: "OTECH-" + String(i).padStart(2, "0"),
+                                                 bateriaPct: (i === 3 || i === 9) ? 12 : 80 }));
+const infG = a.informe({ flota: grande, eventos: [], logs: [] });
+const bloqueCrit = infG.slice(infG.indexOf("HALLAZGOS CRÍTICOS"),
+                              infG.indexOf("== ", infG.indexOf("HALLAZGOS CRÍTICOS") + 5));
+
+comprueba("los dos críticos están en el bloque de críticos",
+  /\[03\]/.test(bloqueCrit) && /\[09\]/.test(bloqueCrit));
+
+comprueba("las aeronaves con hallazgo conservan ficha completa",
+  /^\[03\] .*\n(.*\n)*?   HALLAZGOS:/m.test(infG) && /^\[09\]/m.test(infG));
+
+comprueba("las sanas sobrantes se resumen en vez de truncarse en silencio",
+  /AERONAVE\(S\) SIN HALLAZGOS, EN RESUMEN/.test(infG));
+
+comprueba("el informe cabe holgadamente en 4096 tokens",
+  infG.length / 3.4 < 2000, Math.round(infG.length / 3.4) + " tokens con 14 aeronaves");
+
+comprueba("ninguna aeronave desaparece del informe",
+  (function () {
+    for (let i = 1; i <= 14; i++)
+      if (infG.indexOf("[" + String(i).padStart(2, "0") + "]") === -1) return false;
+    return true;
+  })());
+
 /* ── Estadística ────────────────────────────────────────────────────────── */
 titulo("Cálculo de trayecto");
 
