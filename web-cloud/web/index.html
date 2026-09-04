@@ -22,6 +22,8 @@
   --brand:#14789C; --brand-bright:#1E98C1; --brand-wash:rgba(30,152,193,.12);
   --ok:#1F9D57; --warn:#B57E00; --alert:#D8541F; --crit:#C81E1E;
   --shadow:0 2px 10px rgba(11,23,48,.08),0 12px 34px rgba(11,23,48,.10);
+  --panel-chat:rgba(255,255,255,.34); --burbuja:rgba(255,255,255,.82);
+  --burbuja-edge:rgba(15,27,61,.10);
   --font-display:"Saira Condensed","Arial Narrow",sans-serif;
   --font-body:"Barlow",-apple-system,"Segoe UI",sans-serif;
   --font-data:"IBM Plex Mono",ui-monospace,Consolas,monospace;
@@ -35,6 +37,8 @@
     --brand:#1E98C1; --brand-bright:#4FC3E8; --brand-wash:rgba(79,195,232,.14);
     --ok:#5FD67F; --warn:#FFBF00; --alert:#FF7A45; --crit:#FF4D4D;
     --shadow:0 2px 10px rgba(0,0,0,.35),0 14px 40px rgba(0,0,0,.45);
+    --panel-chat:rgba(10,22,50,.30); --burbuja:rgba(10,22,50,.74);
+    --burbuja-edge:rgba(120,165,215,.16);
   }
 }
 :root[data-theme="dark"] {
@@ -44,6 +48,8 @@
   --brand:#1E98C1; --brand-bright:#4FC3E8; --brand-wash:rgba(79,195,232,.14);
   --ok:#5FD67F; --warn:#FFBF00; --alert:#FF7A45; --crit:#FF4D4D;
   --shadow:0 2px 10px rgba(0,0,0,.35),0 14px 40px rgba(0,0,0,.45);
+  --panel-chat:rgba(10,22,50,.30); --burbuja:rgba(10,22,50,.74);
+  --burbuja-edge:rgba(120,165,215,.16);
 }
 
 *{box-sizing:border-box}
@@ -236,11 +242,22 @@ body{margin:0;background:var(--ground);color:var(--ink);
   border:1px solid rgba(255,255,255,.3);background:rgba(6,14,26,.6);color:#dbe7f7;
   cursor:pointer;display:grid;place-items:center;font-size:13px;line-height:1;padding:0}
 
-/* — asistente — */
-.chat{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+/* — asistente —
+   El panel deja ver la flota moverse por debajo. Bajar la opacidad a secas
+   dejaría el texto apoyado sobre las teselas, así que la transparencia va en
+   el panel y cada mensaje recupera su propio fondo: se ve el mapa entre los
+   mensajes, no a través de ellos. El compositor se mantiene más sólido porque
+   ahí se escribe. */
+.chat{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--panel-chat);
+  backdrop-filter:blur(10px) saturate(135%);-webkit-backdrop-filter:blur(10px) saturate(135%)}
+.chat.opaco{background:var(--panel);
+  backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
 .chat-aviso{display:flex;align-items:center;gap:9px;padding:8px 16px;flex-shrink:0;
   border-bottom:1px solid var(--panel-edge);font-size:11.5px;color:var(--muted);
-  background:color-mix(in srgb,var(--warn) 9%,transparent)}
+  background:color-mix(in srgb,var(--warn) 12%,var(--panel-solid))}
+.chat-aviso .icon-btn{width:26px;height:26px;margin-left:auto}
+.chat-aviso .icon-btn svg{width:13px;height:13px}
 .chat-aviso svg{width:14px;height:14px;color:var(--warn);flex-shrink:0}
 .chat-aviso b{color:var(--ink-soft);font-weight:600}
 .hilo{flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -251,10 +268,17 @@ body{margin:0;background:var(--ground);color:var(--ink);
 .msg.yo .msg-ava{order:2;background:var(--brand-wash);color:var(--brand-bright);
   border:1px solid color-mix(in srgb,var(--brand) 40%,transparent)}
 .msg.ia .msg-ava{background:var(--brand);color:#fff}
-.msg-cuerpo{font-size:13.5px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}
-.msg.yo .msg-cuerpo{order:1;text-align:left;background:var(--brand-wash);border-radius:12px 12px 3px 12px;
-  padding:9px 13px;border:1px solid var(--panel-edge)}
-.msg-meta{font-family:var(--font-data);font-size:10px;color:var(--muted-dim);margin-top:6px}
+.msg-cuerpo{font-size:13.5px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap;
+  padding:9px 13px;border-radius:12px 12px 12px 3px;border:1px solid var(--burbuja-edge);
+  background:var(--burbuja);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.msg.yo .msg-cuerpo{order:1;text-align:left;border-radius:12px 12px 3px 12px;
+  background:color-mix(in srgb,var(--brand) 16%,var(--burbuja));
+  border-color:color-mix(in srgb,var(--brand) 32%,transparent)}
+/* Queda fuera de la burbuja, sobre el mapa; la sombra la mantiene legible
+   pase lo que pase por debajo. */
+.msg-meta{font-family:var(--font-data);font-size:10px;color:var(--muted);margin-top:5px;
+  padding-left:13px;text-shadow:0 1px 2px var(--ground),0 0 4px var(--ground)}
 .msg-err{color:var(--crit)}
 .cursor-ia::after{content:"▍";animation:parpadeo 1s steps(2) infinite;color:var(--brand-bright)}
 @keyframes parpadeo{50%{opacity:0}}
@@ -263,7 +287,8 @@ body{margin:0;background:var(--ground);color:var(--ink);
    pasa por el modelo: es la única parte del chat en la que se puede confiar
    sin leer nada más. */
 .alarma{border:1px solid var(--crit);border-left-width:3px;border-radius:10px;
-  background:color-mix(in srgb,var(--crit) 10%,transparent);padding:10px 13px;max-width:860px}
+  background:color-mix(in srgb,var(--crit) 12%,var(--panel-solid));padding:10px 13px;max-width:860px;
+  box-shadow:var(--shadow)}
 .alarma-tit{display:flex;align-items:center;gap:7px;font-family:var(--font-display);font-size:11px;
   font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--crit)}
 .alarma-tit svg{width:14px;height:14px}
@@ -273,7 +298,9 @@ body{margin:0;background:var(--ground);color:var(--ink);
   color:#08121f;background:var(--c);margin-right:5px}
 .alarma-pie{font-size:11px;color:var(--muted);margin-top:7px;font-style:italic}
 
-.chat-vacio{margin:auto;text-align:center;color:var(--muted);max-width:520px;padding:20px}
+.chat-vacio{margin:auto;text-align:center;color:var(--muted);max-width:540px;padding:22px 24px;
+  border-radius:14px;background:var(--burbuja);border:1px solid var(--burbuja-edge);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .chat-vacio h3{font-family:var(--font-display);font-size:17px;font-weight:600;color:var(--ink);
   margin:0 0 6px;letter-spacing:.03em}
 .chat-vacio p{margin:0 0 18px;font-size:13px;line-height:1.55}
@@ -282,7 +309,10 @@ body{margin:0;background:var(--ground);color:var(--ink);
   color:var(--ink-soft);font-family:var(--font-body);font-size:12.5px;cursor:pointer;transition:.15s}
 .sug:hover{background:var(--brand-wash);border-color:var(--brand);color:var(--ink)}
 
-.compositor{flex-shrink:0;border-top:1px solid var(--panel-edge);padding:11px 14px}
+/* El compositor y la barra de aviso se quedan sólidos: ahí se escribe y ahí
+   se lee la advertencia de que el asistente no manda. */
+.compositor{flex-shrink:0;border-top:1px solid var(--panel-edge);padding:11px 14px;
+  background:var(--panel)}
 .comp-caja{display:flex;gap:9px;align-items:flex-end}
 .comp-caja textarea{flex:1;resize:none;font-family:var(--font-body);font-size:13.5px;line-height:1.5;
   padding:9px 12px;border-radius:10px;border:1px solid var(--panel-edge);background:var(--panel-solid);
@@ -610,6 +640,12 @@ select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius
           </svg>
           <span>El asistente <b>consulta y recomienda; no manda</b>. No tiene canal hacia las
           aeronaves — armado, modo y retorno se ejecutan en la radio.</span>
+          <button class="icon-btn" id="opacidad" aria-pressed="false"
+                  title="Opacar el panel para leer mejor" aria-label="Opacar el panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18Z" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>
         </div>
 
         <div class="hilo" id="hilo">
@@ -1381,6 +1417,23 @@ select{font-family:var(--font-body);font-size:13px;padding:7px 9px;border-radius
     });
   }
   $("llm-modelo").addEventListener("change", function () { modeloActivo = this.value; });
+
+  /* Escotilla de escape para la transparencia: sobre un ortomosaico o un
+     relieve cargado, una respuesta larga puede costar de leer. El ajuste se
+     recuerda, pero su ausencia nunca debe romper la vista. */
+  var chat = document.querySelector(".chat");
+  function ponerOpacidad(opaco) {
+    chat.classList.toggle("opaco", opaco);
+    var b = $("opacidad");
+    b.setAttribute("aria-pressed", String(opaco));
+    b.title = opaco ? "Volver el panel translúcido" : "Opacar el panel para leer mejor";
+  }
+  try { ponerOpacidad(localStorage.getItem("aerohub-chat-opaco") === "1"); } catch (e) {}
+  $("opacidad").addEventListener("click", function () {
+    var opaco = !chat.classList.contains("opaco");
+    ponerOpacidad(opaco);
+    try { localStorage.setItem("aerohub-chat-opaco", opaco ? "1" : "0"); } catch (e) {}
+  });
 
   function burbuja(quien, texto) {
     var vac = $("chat-vacio"); if (vac) vac.remove();

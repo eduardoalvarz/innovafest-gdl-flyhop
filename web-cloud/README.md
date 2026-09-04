@@ -142,6 +142,13 @@ ollama pull llama3.2    # 1.9 GB
 
 El selector del pie del chat permite cambiar de modelo sin reiniciar.
 
+El panel es translúcido para que la flota se siga viendo moverse por debajo.
+La transparencia va en el panel, no en los mensajes: cada burbuja conserva su
+propio fondo, así que se ve el mapa **entre** los mensajes y no a través de
+ellos. El compositor y el aviso de «no manda» se quedan sólidos. Si sobre un
+ortomosaico cargado una respuesta larga cuesta de leer, el botón del círculo
+mitad-lleno de la barra superior opaca el panel, y la elección se recuerda.
+
 [Ollama]: https://ollama.com
 
 ### El juicio de seguridad vive en el código, no en el modelo
