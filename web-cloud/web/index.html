@@ -205,7 +205,9 @@ body{margin:0;background:var(--bg);color:var(--ink);
    una fila propia en lugar de flotar encima. Nada tapa el mapa. */
 .field{position:relative;background:var(--surface);overflow:hidden;
   display:grid;grid-template-rows:auto minmax(0,1fr)}
-#map{position:relative;background:var(--surface-2)}
+/* El min-height es una red, no una medida: si algún cambio futuro dejara la
+   fila del mapa sin alto, es preferible un mapa pequeño a ninguno. */
+#map{position:relative;background:var(--surface-2);min-height:140px}
 
 .field-top{display:flex;align-items:stretch;background:var(--surface);
   border-bottom:1px solid var(--line)}
@@ -571,9 +573,10 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
   <!-- ── Centro ────────────────────────────────────────────────────────── -->
   <main class="stage" id="stage">
 
+    <!-- El orden importa: .field es una retícula de dos filas, `auto` para la
+         banda de estado y `1fr` para el mapa. Si #map fuera primero caería en
+         la fila `auto`, y un div vacío mide cero: el mapa desaparecería. -->
     <section class="field" id="v-mapa">
-      <div id="map"></div>
-
       <div class="field-top">
         <div class="mission">
           <span class="mission-n" id="m-name">Sin aeronave</span>
@@ -591,6 +594,8 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
           <button class="capa" data-capa="propio" aria-pressed="false" title="Ortomosaicos en web/tiles/">Propio</button>
         </div>
       </div>
+
+      <div id="map"></div>
 
       <div class="pip" id="pip"></div>
     </section>
@@ -751,6 +756,15 @@ select:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
   var map = L.map("map", { zoomControl: false, attributionControl: true })
              .setView([20.7431, -100.4512], 14);
   L.control.zoom({ position: "bottomleft" }).addTo(map);
+
+  /* Leaflet mide el contenedor al construirse y no se entera de los cambios
+     de retícula. Observar el elemento cubre el abrir y cerrar del zócalo, el
+     redimensionado de la ventana y cualquier reorganización futura, sin tener
+     que acordarse de llamar a invalidateSize en cada sitio. */
+  if (window.ResizeObserver) {
+    new ResizeObserver(function () { map.invalidateSize({ animate: false }); })
+      .observe(document.getElementById("map"));
+  }
 
   /* Solo fuentes de uso libre, también comercial:
        calle  — OpenStreetMap, datos ODbL, atribución obligatoria
